@@ -18,9 +18,22 @@ async function scrapeTelegramChannel() {
 
             const textBlock = $(el).find('.tgme_widget_message_text');
             const htmlContent = textBlock.html();
-            const textContent = textBlock.text();
 
-            if (!textContent) return;
+            if (!htmlContent) return;
+
+            // Convertir el HTML a texto preservando saltos de línea:
+            // <br> y </p> se traducen a \n, el resto de etiquetas se eliminan
+            const textContent = htmlContent
+                .replace(/<br\s*\/?>/gi, '\n')       // <br> → salto de línea
+                .replace(/<\/p>/gi, '\n')             // </p> → salto de línea
+                .replace(/<[^>]+>/g, '')              // Eliminar resto de etiquetas HTML
+                .replace(/&amp;/g, '&')               // Decodificar entidades HTML comunes
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\n{3,}/g, '\n\n')           // Máximo 2 saltos de línea seguidos
+                .trim();
 
             // Extraer fecha del mensaje
             const timeElement = $(el).find('time').attr('datetime'); // Ej: 2024-03-08T15:21:00+00:00

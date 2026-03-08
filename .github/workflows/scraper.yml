@@ -3,7 +3,7 @@ name: Alertas de Empleo Bot
 on:
   schedule:
     # Ejecutar cada 15 minutos
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   # Permite ejecutarlo manualmente desde GitHub (para probar)
   workflow_dispatch:
 
