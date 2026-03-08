@@ -31,8 +31,8 @@ async function scrapeTelegramChannel() {
                 const now = new Date();
                 const hoursDifference = (now - messageDate) / (1000 * 60 * 60);
 
-                // PRUEBA TEMPORAL: 90h para atrapar mensaje del 5/marzo. Volver a 24h luego.
-                if (hoursDifference > 90) {
+                // Solo notificar ofertas de las últimas 24 horas para evitar spam antiguo
+                if (hoursDifference > 24) {
                     isRecent = false;
                 }
             }
