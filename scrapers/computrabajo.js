@@ -154,9 +154,11 @@ function extractJobsFromPage($, targetUrl) {
         if (!title) return;
 
         const linkPath = titleEl.first().attr('href');
-        const jobUrl = linkPath
+        const rawUrl = linkPath
             ? (linkPath.startsWith('http') ? linkPath : `https://cl.computrabajo.com${linkPath}`)
             : targetUrl;
+        // Limpiar fragmento de tracking (#lc=...) que rompe los links en móvil
+        const jobUrl = rawUrl.split('#')[0];
 
         const company = $(el).find('[data-company-name], p.dV a').first().text().trim()
             || $(el).find('p.dV').first().text().trim();
