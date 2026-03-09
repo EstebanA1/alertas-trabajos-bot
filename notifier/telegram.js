@@ -8,16 +8,28 @@ const chatId = process.env.TELEGRAM_CHAT_ID;
 const bot = new TelegramBot(token, { polling: false });
 
 async function enviarAlerta(jobData) {
-    const { url, source, description } = jobData;
-    
-    // Replicar el texto completo del mensaje original del canal
-    // Telegram tiene un límite de 4096 caracteres por mensaje
-    const textoCompleto = description ? description.substring(0, 3900) : '(sin texto)';
-    
+    const { title, company, url, source, description } = jobData;
+    const esCanalTelegram = source.toLowerCase().includes('telegram');
+
     let mensaje = `🚨 <b>Nueva oferta — ${source}</b>\n`;
     mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
-    mensaje += `${textoCompleto}\n\n`;
-    mensaje += `🔗 <a href="${url}">Ver mensaje original en el canal</a>`;
+
+    if (esCanalTelegram) {
+        // Canal de Telegram: description ya contiene todo el texto del post original
+        const texto = description ? description.substring(0, 3900) : '(sin texto)';
+        mensaje += `${texto}\n\n`;
+        mensaje += `🔗 <a href="${url}">Ver en el canal</a>`;
+    } else {
+        // Portales de empleo (CT, Jooble, etc.): mostrar título, empresa y descripción
+        if (title)   mensaje += `💼 <b>${title}</b>\n`;
+        if (company) mensaje += `🏢 ${company}\n`;
+        if (description && description.trim()) {
+            mensaje += `\n${description.substring(0, 3500)}\n\n`;
+        } else {
+            mensaje += `\n`;
+        }
+        mensaje += `🔗 <a href="${url}">Ver oferta completa</a>`;
+    }
 
     try {
         await bot.sendMessage(chatId, mensaje, { parse_mode: 'HTML', disable_web_page_preview: true });

@@ -37,14 +37,53 @@ async function fetchJobDescription(jobUrl) {
         const proxyUrl = buildScraperApiUrl(jobUrl);
         const { data } = await axios.get(proxyUrl, { timeout: 30000 });
         const $ = cheerio.load(data);
-        const descHtml = $('#jobDescription').html()
-            || $('.job-description').html()
-            || $('[data-id="oferta-detalle"]').html()
-            || $('section.box_offer_detail').html()
-            || '';
+
+        // Intentar selectores conocidos de Computrabajo (del más específico al más general)
+        const selectores = [
+            '#jobDescription',
+            '#job-description',
+            '.job-description',
+            '.jobDescription',
+            '#oferta-detalle',
+            '[data-id="oferta-detalle"]',
+            'section.box_offer_detail',
+            '.offer_description',
+            '.offer-description',
+            '#offerDescription',
+            '.cont_description',
+            'div[class*="description"]',
+            'div[class*="Description"]',
+            'section[class*="description"]',
+            'article[class*="description"]',
+        ];
+
+        let descHtml = '';
+        for (const sel of selectores) {
+            const el = $(sel);
+            if (el.length && el.html()?.trim()) {
+                descHtml = el.html();
+                break;
+            }
+        }
+
+        // Fallback: si ningún selector funcionó, buscar el bloque de texto más largo de la página
+        if (!descHtml) {
+            let maxLen = 0;
+            $('div, section, article').each((_, el) => {
+                // Ignorar headers, footers, navs y sidebars
+                const tag = $(el).parents('header, footer, nav, aside').length;
+                if (tag) return;
+                const text = $(el).text().trim();
+                if (text.length > maxLen && text.length > 200) {
+                    maxLen = text.length;
+                    descHtml = $(el).html();
+                }
+            });
+        }
+
         return htmlToText(descHtml);
     } catch (err) {
-        console.warn(`[Scraper] No se pudo obtener descripción de: ${jobUrl}`);
+        console.warn(`[Scraper] No se pudo obtener descripción de: ${jobUrl} — ${err.message}`);
         return '';
     }
 }

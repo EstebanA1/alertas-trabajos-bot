@@ -34,7 +34,7 @@ jobs:
           # Búsquedas amplias en CT (pocas, para ser eficientes con ScraperAPI)
           CT_QUERY: "desarrollador,programador,ingeniero informatico,fullstack"
           # Whitelist: la oferta DEBE tener al menos una de estas tecnologías para notificar
-          WHITELIST_KEYWORDS: "javascript,typescript,node,react,python,css,html,express,docker,angular,postgresql,mongodb,sql,next,vite,fastapi,django,flask"
+          WHITELIST_KEYWORDS: "javascript,typescript,node,react,python,css,html,express,docker,angular,postgresql,mongodb,sql,next,vite,fastapi,django,flask,c#,.net"
           # Blacklist: si aparece cualquiera de estas, la oferta se descarta
-          BLACKLIST_KEYWORDS: "java,ruby,php,scala,kotlin,cobol,sap,mainframe"
+          BLACKLIST_KEYWORDS: "java,ruby,php,scala,kotlin,cobol,sap,mainframe,vue,vue.js"
         run: node test_scraper.js
