@@ -1,6 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 require('dotenv').config();
+const config = require('../config');
 
 // ScraperAPI actúa como proxy rotatorio de IPs residenciales.
 function buildScraperApiUrl(targetUrl) {
@@ -27,7 +28,18 @@ function htmlToText(html) {
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
         .replace(/&nbsp;/g, ' ')
-        .replace(/\n{3,}/g, '\n\n')
+        // Limpiar líneas de ruido: muy cortas (< 3 chars) o solo espacios
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length >= 3 || l === '')
+        // Colapsar múltiples líneas vacías a máximo UNA
+        .reduce((acc, line) => {
+            const lastIsEmpty = acc.length > 0 && acc[acc.length - 1] === '';
+            if (line === '' && lastIsEmpty) return acc; // Saltar línea vacía extra
+            acc.push(line);
+            return acc;
+        }, [])
+        .join('\n')
         .trim();
 }
 
@@ -81,7 +93,47 @@ async function fetchJobDescription(jobUrl) {
             });
         }
 
-        return htmlToText(descHtml);
+        const rawText = htmlToText(descHtml);
+
+        // 1. INICIO: buscar donde empieza la descripción real (cortar menú de navegación)
+        const marcadoresInicio = [
+            'descripción de la oferta',
+            'descripcion de la oferta',
+            'sobre el empleo',
+            'acerca del empleo',
+        ];
+        let textoFinal = rawText;
+        for (const marcador of marcadoresInicio) {
+            const idx = rawText.toLowerCase().indexOf(marcador);
+            if (idx !== -1) {
+                textoFinal = rawText.slice(idx).replace(/^[^\n]+\n/, '').trim();
+                break;
+            }
+        }
+
+        // 2. FIN: cortar todo lo que viene después de secciones de boilerplate de CT
+        // (reseñas de empresa, salarios, ofertas similares, botones UI, etc.)
+        const marcadoresFin = [
+            'palabras clave:',
+            'acerca de ',
+            'evaluación general',
+            'evaluacion general',
+            'mostrar las',
+            'mostrar los',
+            'ofertas similares',
+            'avísame con ofertas',
+            'avisame con ofertas',
+            'denunciar empleo',
+            'postularme',
+        ];
+        for (const marcador of marcadoresFin) {
+            const idx = textoFinal.toLowerCase().indexOf(marcador);
+            if (idx !== -1 && idx > 50) { // > 50 para no cortar si está al inicio
+                textoFinal = textoFinal.slice(0, idx).trim();
+            }
+        }
+
+        return textoFinal;
     } catch (err) {
         console.warn(`[Scraper] No se pudo obtener descripción de: ${jobUrl} — ${err.message}`);
         return '';
@@ -127,7 +179,7 @@ async function scrapeComputrabajo(seenJobIds = new Set()) {
 
     // CT_QUERY puede tener múltiples términos separados por coma.
     // Computrabajo solo acepta UN término por URL, así que hacemos una búsqueda por término.
-    const queries = (process.env.CT_QUERY || 'desarrollador')
+    const queries = (process.env.CT_QUERY || config.CT_QUERY)
         .split(',')
         .map(q => q.trim())
         .filter(Boolean);

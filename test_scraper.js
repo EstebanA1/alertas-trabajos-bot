@@ -2,19 +2,18 @@
 // Usado por GitHub Actions (cron) y para pruebas manuales en local.
 
 require('dotenv').config();
+const config = require('./config');
 const { addJob, isJobSeen, getSeenJobsSet } = require('./db/database');
 const { enviarAlerta } = require('./notifier/telegram');
 const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
 const { scrapeComputrabajo } = require('./scrapers/computrabajo');
 
 // --- Filtros de keywords ---
-// WHITELIST: aplica SOLO a portales de empleo (CT, Jooble, etc.), NO al canal de Telegram.
-// La oferta debe tener AL MENOS UNA de estas palabras en título o descripción.
-const WHITELIST = (process.env.WHITELIST_KEYWORDS || '')
+// WHITELIST y BLACKLIST: se leen del entorno o de config.js como fallback
+const WHITELIST = (process.env.WHITELIST_KEYWORDS || config.WHITELIST_KEYWORDS)
     .split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
 
-// BLACKLIST: aplica a TODOS los scrapers. Si contiene alguna → descartada.
-const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || '')
+const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || config.BLACKLIST_KEYWORDS)
     .split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
 
 function pasaFiltros(job, aplicarWhitelist = false) {
