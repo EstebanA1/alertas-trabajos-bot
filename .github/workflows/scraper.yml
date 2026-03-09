@@ -31,6 +31,10 @@ jobs:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
-          CT_QUERY: "desarrollador,developer,programador,ingeniero,software,backend,frontend,fullstack,HTML,HTML5,CSS,CSS3,JavaScript,javascript,TypeScript,typescript,node,react,python,express,docker,angular,postgresql,mongodb,sql,c#,.net"
+          # Búsquedas amplias en CT (pocas, para ser eficientes con ScraperAPI)
+          CT_QUERY: "desarrollador,programador,ingeniero informatico,fullstack"
+          # Whitelist: la oferta DEBE tener al menos una de estas tecnologías para notificar
+          WHITELIST_KEYWORDS: "javascript,typescript,node,react,python,css,html,express,docker,angular,postgresql,mongodb,sql,next,vite,fastapi,django,flask"
+          # Blacklist: si aparece cualquiera de estas, la oferta se descarta
           BLACKLIST_KEYWORDS: "java,ruby,php,scala,kotlin,cobol,sap,mainframe"
         run: node test_scraper.js

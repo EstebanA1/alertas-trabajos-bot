@@ -7,61 +7,78 @@ const { enviarAlerta } = require('./notifier/telegram');
 const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
 const { scrapeComputrabajo } = require('./scrapers/computrabajo');
 
-// Cargar blacklist de palabras bloqueadas (no sensible, puede ir en el workflow directamente)
-const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || '')
-    .split(',')
-    .map(w => w.trim().toLowerCase())
-    .filter(Boolean);
+// --- Filtros de keywords ---
+// WHITELIST: aplica SOLO a portales de empleo (CT, Jooble, etc.), NO al canal de Telegram.
+// La oferta debe tener AL MENOS UNA de estas palabras en título o descripción.
+const WHITELIST = (process.env.WHITELIST_KEYWORDS || '')
+    .split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
 
-function esOfertaBloqueada(job) {
-    if (BLACKLIST.length === 0) return false;
+// BLACKLIST: aplica a TODOS los scrapers. Si contiene alguna → descartada.
+const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || '')
+    .split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+
+function pasaFiltros(job, aplicarWhitelist = false) {
     const texto = `${job.title} ${job.description}`.toLowerCase();
-    const match = BLACKLIST.find(p => texto.includes(p));
-    if (match) {
-        console.log(`🚫 Bloqueada por '${match}': ${job.title}`);
-        return true;
+
+    // 1. Blacklist (siempre aplica)
+    const bloqueada = BLACKLIST.find(p => texto.includes(p));
+    if (bloqueada) {
+        console.log(`🚫 Bloqueada ['${bloqueada}']: ${job.title}`);
+        return false;
     }
-    return false;
+
+    // 2. Whitelist (solo para portales de empleo, no para Telegram)
+    if (aplicarWhitelist && WHITELIST.length > 0) {
+        const coincide = WHITELIST.find(p => texto.includes(p));
+        if (!coincide) {
+            console.log(`⏭️  Sin tecnologías de interés: ${job.title}`);
+            return false;
+        }
+    }
+
+    return true;
 }
 
 async function runOnce() {
     console.log(`\n[${new Date().toLocaleTimeString()}] === INICIANDO RONDA DE BÚSQUEDA ===`);
-    let allJobs = [];
-
-    // Pre-cargar IDs vistos para optimizar llamadas a ScraperAPI en CT
     const seenJobIds = await getSeenJobsSet();
 
-    // 1. Canal de Telegram
+    // ── 1. Canal de Telegram (sin whitelist: queremos todo lo del canal) ──
     const tgJobs = await scrapeTelegramChannel();
-    allJobs = allJobs.concat(tgJobs);
 
-    // 2. Computrabajo
+    // ── 2. Computrabajo (con whitelist: filtra por tecnologías de interés) ──
     const ctJobs = await scrapeComputrabajo(seenJobIds);
-    allJobs = allJobs.concat(ctJobs);
 
-    // 3. Más scrapers se añadirán aquí...
+    // ── 3. Más scrapers se añadirán aquí ──
 
-    // 4. Aplicar blacklist, deduplicar y notificar
     let nuevas = 0;
-    let bloqueadas = 0;
+    let descartadas = 0;
 
-    for (const job of allJobs) {
-        if (esOfertaBloqueada(job)) {
-            bloqueadas++;
-            await addJob(job.id); // Marcar como visto para no reprocesar
-            continue;
-        }
-        if (!(await isJobSeen(job.id))) {
-            if (await addJob(job.id)) {
-                nuevas++;
-                await enviarAlerta(job);
-                await new Promise(r => setTimeout(r, 500));
+    // Procesar grupos con su configuración de whitelist correspondiente
+    const grupos = [
+        { jobs: tgJobs,  whitelist: false },  // Telegram: sin whitelist
+        { jobs: ctJobs,  whitelist: true  },  // CT: con whitelist (más ruido)
+    ];
+
+    for (const { jobs, whitelist } of grupos) {
+        for (const job of jobs) {
+            if (!pasaFiltros(job, whitelist)) {
+                descartadas++;
+                await addJob(job.id); // Marcar como visto para no reprocesar
+                continue;
+            }
+            if (!(await isJobSeen(job.id))) {
+                if (await addJob(job.id)) {
+                    nuevas++;
+                    await enviarAlerta(job);
+                    await new Promise(r => setTimeout(r, 500));
+                }
             }
         }
     }
 
-    console.log(`=== RONDA FINALIZADA: ${nuevas} nuevas enviadas, ${bloqueadas} bloqueadas ===\n`);
-    process.exit(0); // Necesario para que GitHub Actions no quede colgado
+    console.log(`=== RONDA FINALIZADA: ${nuevas} enviadas, ${descartadas} descartadas ===\n`);
+    process.exit(0);
 }
 
 runOnce();
