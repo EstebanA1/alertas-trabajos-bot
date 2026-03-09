@@ -136,7 +136,7 @@ async function scrapeComputrabajo(seenJobIds = new Set()) {
     const seenInThisRun = new Set(); // Evitar duplicados entre distintas búsquedas
 
     for (const query of queries) {
-        const targetUrl = `https://cl.computrabajo.com/trabajo-de-${encodeURIComponent(query)}?by=pubdate`;
+        const targetUrl = `https://cl.computrabajo.com/trabajo-de-${encodeURIComponent(query)}?by=pubdate&pubdate=1`;
         const listingUrl = buildScraperApiUrl(targetUrl);
 
         try {
