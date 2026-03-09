@@ -4,7 +4,6 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = process.env.TELEGRAM_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
 
-// Creamos la instancia del bot
 const bot = new TelegramBot(token, { polling: false });
 
 async function enviarAlerta(jobData) {
@@ -15,12 +14,10 @@ async function enviarAlerta(jobData) {
     mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
 
     if (esCanalTelegram) {
-        // Canal de Telegram: description ya contiene todo el texto del post original
         const texto = description ? description.substring(0, 3900) : '(sin texto)';
         mensaje += `${texto}\n\n`;
         mensaje += `🔗 <a href="${url}">Ver en el canal</a>`;
     } else {
-        // Portales de empleo (CT, Jooble, etc.): mostrar título, empresa y descripción
         if (title)   mensaje += `💼 <b>${title}</b>\n`;
         if (company) mensaje += `🏢 ${company}\n`;
         if (description && description.trim()) {
@@ -41,6 +38,4 @@ async function enviarAlerta(jobData) {
     }
 }
 
-module.exports = {
-    enviarAlerta
-};
+module.exports = { enviarAlerta };

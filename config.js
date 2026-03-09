@@ -1,9 +1,8 @@
 module.exports = {
-    // Términos de búsqueda en Computrabajo (uno por búsqueda, separados por coma)
+    // Términos de búsqueda en Computrabajo y Laborum (uno por búsqueda, separados por coma)
     CT_QUERY: 'desarrollador,programador,ingeniero informatico,fullstack',
 
-    // La oferta DEBE contener al menos una de estas tecnologías para ser notificada
-    // (aplica a portales de empleo, NO al canal de Telegram)
+    // La oferta DEBE contener al menos una de estas tecnologías (aplica a portales de empleo, NO al canal Telegram)
     WHITELIST_KEYWORDS: [
         'javascript', 'typescript', 'node', 'react', 'python',
         'css', 'html', 'express', 'docker', 'angular', 'postgresql',
@@ -16,13 +15,12 @@ module.exports = {
         // Tecnologías no manejadas
         'java', 'ruby', 'php', 'scala', 'kotlin', 'cobol', 'sap', 'mainframe',
         'vue', 'vue.js',
-        // Roles de ventas / call center / terreno que se cuelan por búsquedas amplias
+        // Roles de ventas / call center que se cuelan por búsquedas amplias
         'vendedor', 'vendedora', 'ventas en terreno', 'call center', 'teleoperador',
         'telemarketing', 'reponedor', 'promotor de ventas', 'ejecutivo de ventas',
         'asesor comercial', 'fuerza de ventas', 'captación de clientes',
-        // Experiencia mínima mayor a la disponible
+        // Experiencia mayor a la disponible
         '3 años de experiencia', '4 años de experiencia', '5 años de experiencia',
         '3 años en', '4 años en', '5 años en',
     ].join(','),
 };
-
