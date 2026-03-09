@@ -6,6 +6,7 @@ const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
 const { scrapeComputrabajo } = require('./scrapers/computrabajo');
 const { scrapeLaborum } = require('./scrapers/laborum');
 const { scrapeGetOnBoard } = require('./scrapers/getonboard');
+const { scrapeTrabajandog } = require('./scrapers/trabajando');
 
 const WHITELIST = (process.env.WHITELIST_KEYWORDS || config.WHITELIST_KEYWORDS)
     .split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
@@ -28,8 +29,22 @@ function matchPalabra(texto, palabra) {
     return regex.test(texto);
 }
 
+// Captura experiencia >= 3 años en cualquier formato:
+// "3+ años", "4 años de experiencia", "experiencia de 5 años", "mínimo 3 años", etc.
+const EXP_REGEX = /(?:experiencia(?:\s+\w+){0,4}\s+(?:de\s+)?|mínimo\s+|al\s+menos\s+|sobre\s+)?([3-9]|\d{2,})\s*\+?\s*años(?:\s+(?:de\s+)?(?:experiencia|trayectoria)|\s+en\s+(?:cargos?|roles?|el\s+cargo))?/;
+
+function tieneExpExcesiva(texto) {
+    const match = texto.match(EXP_REGEX);
+    return match !== null;
+}
+
 function pasaFiltros(job, aplicarWhitelist = false) {
     const texto = `${job.title} ${job.description}`.toLowerCase();
+
+    if (tieneExpExcesiva(texto)) {
+        console.log(`🚫 Bloqueada [experiencia >= 3 años]: ${job.title}`);
+        return false;
+    }
 
     const hardHit = BLACKLIST_HARD.find(p => matchPalabra(texto, p));
     if (hardHit) {
@@ -65,6 +80,7 @@ async function runOnce() {
     const ctJobs = await scrapeComputrabajo(seenJobIds);
     const laborumJobs = await scrapeLaborum(seenJobIds);
     const gobJobs = await scrapeGetOnBoard(seenJobIds);
+    const trabajandoJobs = await scrapeTrabajandog(seenJobIds);
 
     let nuevas = 0;
     let descartadas = 0;
@@ -75,6 +91,7 @@ async function runOnce() {
         { jobs: ctJobs, whitelist: true },
         { jobs: laborumJobs, whitelist: true },
         { jobs: gobJobs, whitelist: true },
+        { jobs: trabajandoJobs, whitelist: true },
     ];
 
     for (const { jobs, whitelist } of grupos) {
