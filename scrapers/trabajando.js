@@ -14,6 +14,14 @@ function esReciente(fechaStr) {
     return publicado >= hace24h;
 }
 
+function slugify(str) {
+    return (str || 'empleo')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
 async function scrapeTrabajandog(seenJobIds = new Set()) {
     const queries = (process.env.CT_QUERY || config.CT_QUERY)
         .split(',').map(q => q.trim()).filter(Boolean);
@@ -44,6 +52,8 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
             const jobList = response.data?.ofertas || [];
             console.log(`[Scraper] '${query}': ${jobList.length} ofertas.`);
 
+            const slugQuery = slugify(query);
+
             for (const item of jobList) {
                 if (!esReciente(item.fechaPublicacion)) continue;
 
@@ -51,9 +61,12 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                 if (seenInThisRun.has(jobId)) continue;
                 seenInThisRun.add(jobId);
 
+                // /empleo/id/{id} redirige a la oferta correcta y funciona en la app móvil
                 const jobUrl = `https://www.trabajando.cl/empleo/id/${item.idOferta}`;
 
                 let description = '';
+                let aniosExp = null;
+
                 if (!seenJobIds.has(jobId)) {
                     try {
                         const detail = await axios.get(
@@ -68,6 +81,7 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                             }
                         );
                         const d = detail.data;
+                        aniosExp = d.aniosExperiencia ?? null;
                         const partes = [
                             htmlToText(d.descripcionOferta || '', { secciones: true }),
                             d.requisitosMinimos ? `\nRequisitos mínimos\n${htmlToText(d.requisitosMinimos, { secciones: true })}` : '',
@@ -77,6 +91,12 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                     } catch (err) {
                         console.warn(`[Scraper] No se pudo obtener detalle de ${jobId}: ${err.message}`);
                     }
+                }
+
+                // Filtro de experiencia directo desde el campo de la API (más fiable que el regex en texto)
+                if (aniosExp !== null && aniosExp >= 3) {
+                    console.log(`[Scraper] Descartada por experiencia (${aniosExp} años): ${item.nombreCargo}`);
+                    continue;
                 }
 
                 jobs.push({

@@ -30,7 +30,6 @@ function matchPalabra(texto, palabra) {
 }
 
 // Captura experiencia >= 3 años en cualquier formato:
-// "3+ años", "4 años de experiencia", "experiencia de 5 años", "mínimo 3 años", etc.
 const EXP_REGEX = /(?:experiencia(?:\s+\w+){0,4}\s+(?:de\s+)?|mínimo\s+|al\s+menos\s+|sobre\s+)?([3-9]|\d{2,})\s*\+?\s*años(?:\s+(?:de\s+)?(?:experiencia|trayectoria)|\s+en\s+(?:cargos?|roles?|el\s+cargo))?/;
 
 function tieneExpExcesiva(texto) {
@@ -73,13 +72,23 @@ function pasaFiltros(job, aplicarWhitelist = false) {
 }
 
 async function runOnce() {
-    console.log(`\n[${new Date().toLocaleTimeString()}] === INICIANDO RONDA DE BÚSQUEDA ===`);
     const seenJobIds = await getSeenJobsSet();
 
+    const timestamp = () => `[${new Date().toLocaleTimeString()}]`;
+
+    console.log(`${timestamp()} === REVISANDO CANAL DE TELEGRAM ===`);
     const tgJobs = await scrapeTelegramChannel();
+
+    console.log(`${timestamp()}\n === REVISANDO COMPUTRABAJO ===`);
     const ctJobs = await scrapeComputrabajo(seenJobIds);
+
+    console.log(`${timestamp()}\n === REVISANDO LABORUM ===`);
     const laborumJobs = await scrapeLaborum(seenJobIds);
+
+    console.log(`${timestamp()}\n === REVISANDO GETONBOARD ===`);
     const gobJobs = await scrapeGetOnBoard(seenJobIds);
+
+    console.log(`${timestamp()}\n === REVISANDO TRABAJANDO.CL ===`);
     const trabajandoJobs = await scrapeTrabajandog(seenJobIds);
 
     let nuevas = 0;
@@ -113,7 +122,7 @@ async function runOnce() {
         }
     }
 
-    console.log(`=== RONDA FINALIZADA: ${nuevas} enviadas, ${descartadas} descartadas, ${yaVistas} ya vistas ===\n`);
+    console.log(`\n=== RONDA FINALIZADA: ${nuevas} enviadas, ${descartadas} descartadas, ${yaVistas} ya vistas ===\n`);
     process.exit(0);
 }
 
