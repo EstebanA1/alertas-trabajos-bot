@@ -20,6 +20,9 @@ module.exports = {
         'vendedor', 'vendedora', 'ventas en terreno', 'call center', 'teleoperador',
         'telemarketing', 'reponedor', 'promotor de ventas', 'ejecutivo de ventas',
         'asesor comercial', 'fuerza de ventas', 'captación de clientes',
+        // Experiencia mínima mayor a la disponible
+        '3 años de experiencia', '4 años de experiencia', '5 años de experiencia',
+        '3 años en', '4 años en', '5 años en',
     ].join(','),
 };
 

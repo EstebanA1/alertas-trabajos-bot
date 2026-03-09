@@ -7,6 +7,7 @@ const { addJob, isJobSeen, getSeenJobsSet } = require('./db/database');
 const { enviarAlerta } = require('./notifier/telegram');
 const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
 const { scrapeComputrabajo } = require('./scrapers/computrabajo');
+const { scrapeLaborum } = require('./scrapers/laborum');
 
 // --- Filtros de keywords ---
 // WHITELIST y BLACKLIST: se leen del entorno o de config.js como fallback
@@ -48,15 +49,19 @@ async function runOnce() {
     // ── 2. Computrabajo (con whitelist: filtra por tecnologías de interés) ──
     const ctJobs = await scrapeComputrabajo(seenJobIds);
 
-    // ── 3. Más scrapers se añadirán aquí ──
+    // ── 3. Laborum Chile (API interna, sin ScraperAPI, con whitelist) ──
+    const laborumJobs = await scrapeLaborum(seenJobIds);
+
+    // ── 4. Más scrapers se añadirán aquí ──
 
     let nuevas = 0;
     let descartadas = 0;
 
     // Procesar grupos con su configuración de whitelist correspondiente
     const grupos = [
-        { jobs: tgJobs,  whitelist: false },  // Telegram: sin whitelist
-        { jobs: ctJobs,  whitelist: true  },  // CT: con whitelist (más ruido)
+        { jobs: tgJobs,       whitelist: false },  // Telegram: sin whitelist
+        { jobs: ctJobs,       whitelist: true  },  // CT: con whitelist
+        { jobs: laborumJobs,  whitelist: true  },  // Laborum: con whitelist
     ];
 
     for (const { jobs, whitelist } of grupos) {
