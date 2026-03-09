@@ -12,7 +12,7 @@ function buildScraperApiUrl(targetUrl) {
     return `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(targetUrl)}&country_code=cl`;
 }
 
-// Convierte HTML a texto limpio preservando saltos de línea (igual que telegram_channel.js)
+// Convierte HTML a texto limpio preservando saltos de línea
 function htmlToText(html) {
     if (!html) return '';
     return html
@@ -37,87 +37,106 @@ async function fetchJobDescription(jobUrl) {
         const proxyUrl = buildScraperApiUrl(jobUrl);
         const { data } = await axios.get(proxyUrl, { timeout: 30000 });
         const $ = cheerio.load(data);
-
-        // Computrabajo pone la descripción completa en #jobDescription o .job-description
         const descHtml = $('#jobDescription').html()
             || $('.job-description').html()
             || $('[data-id="oferta-detalle"]').html()
             || $('section.box_offer_detail').html()
             || '';
-
         return htmlToText(descHtml);
     } catch (err) {
-        console.warn(`[Scraper] No se pudo obtener descripción completa de: ${jobUrl}`);
+        console.warn(`[Scraper] No se pudo obtener descripción de: ${jobUrl}`);
         return '';
     }
 }
 
-async function scrapeComputrabajo(seenJobIds = new Set()) {
-    const query = process.env.CT_QUERY || 'desarrollador';
-    const targetUrl = `https://cl.computrabajo.com/trabajo-de-${query}?by=pubdate`;
-    const listingUrl = buildScraperApiUrl(targetUrl);
+// Extrae los trabajos básicos de una página de resultados de CT
+function extractJobsFromPage($, targetUrl) {
     const sourceName = 'Computrabajo Chile';
+    const rawJobs = [];
+
+    $('article[data-id]').each((i, el) => {
+        const jobId = $(el).attr('data-id');
+        if (!jobId) return;
+
+        const titleEl = $(el).find('h2 a, .js-o-link');
+        const title = titleEl.first().text().trim();
+        if (!title) return;
+
+        const linkPath = titleEl.first().attr('href');
+        const jobUrl = linkPath
+            ? (linkPath.startsWith('http') ? linkPath : `https://cl.computrabajo.com${linkPath}`)
+            : targetUrl;
+
+        const company = $(el).find('[data-company-name], p.dV a').first().text().trim()
+            || $(el).find('p.dV').first().text().trim();
+
+        // Filtro de tiempo: ignorar si tiene más de 1 día
+        const dateText = $(el).find('.pb5 > span, time').first().text().trim().toLowerCase();
+        if (dateText.includes('día') || dateText.includes('dias')) {
+            const days = parseInt(dateText.match(/\d+/)?.[0] || '1');
+            if (days > 1) return;
+        }
+
+        rawJobs.push({ id: `ct_${jobId}`, title, company, url: jobUrl, source: sourceName });
+    });
+
+    return rawJobs;
+}
+
+async function scrapeComputrabajo(seenJobIds = new Set()) {
+    const sourceName = 'Computrabajo Chile';
+
+    // CT_QUERY puede tener múltiples términos separados por coma.
+    // Computrabajo solo acepta UN término por URL, así que hacemos una búsqueda por término.
+    const queries = (process.env.CT_QUERY || 'desarrollador')
+        .split(',')
+        .map(q => q.trim())
+        .filter(Boolean);
+
     const jobs = [];
+    const seenInThisRun = new Set(); // Evitar duplicados entre distintas búsquedas
 
-    try {
-        console.log(`[Scraper] Buscando en ${sourceName} con término '${query}'...`);
-        const { data } = await axios.get(listingUrl, { timeout: 30000 });
-        const $ = cheerio.load(data);
+    for (const query of queries) {
+        const targetUrl = `https://cl.computrabajo.com/trabajo-de-${encodeURIComponent(query)}?by=pubdate`;
+        const listingUrl = buildScraperApiUrl(targetUrl);
 
-        // Recopilar primero los trabajos básicos del listado
-        const rawJobs = [];
-        $('article[data-id]').each((i, el) => {
-            const jobId = $(el).attr('data-id');
-            if (!jobId) return;
+        try {
+            console.log(`[Scraper] ${sourceName}: buscando '${query}'...`);
+            const { data } = await axios.get(listingUrl, { timeout: 30000 });
+            const $ = cheerio.load(data);
+            const rawJobs = extractJobsFromPage($, targetUrl);
 
-            const titleEl = $(el).find('h2 a, .js-o-link');
-            const title = titleEl.first().text().trim();
-            if (!title) return;
+            console.log(`[Scraper] '${query}': ${rawJobs.length} ofertas. Obteniendo descripciones de nuevas...`);
 
-            const linkPath = titleEl.first().attr('href');
-            const jobUrl = linkPath
-                ? (linkPath.startsWith('http') ? linkPath : `https://cl.computrabajo.com${linkPath}`)
-                : targetUrl;
+            for (const job of rawJobs) {
+                // Saltar si ya procesamos este job en esta misma ronda (puede aparecer en 2 búsquedas)
+                if (seenInThisRun.has(job.id)) continue;
+                seenInThisRun.add(job.id);
 
-            const company = $(el).find('[data-company-name], p.dV a').first().text().trim()
-                || $(el).find('p.dV').first().text().trim();
-
-            // Filtro de tiempo: "Hace X días" → ignorar si X > 1
-            const dateText = $(el).find('.pb5 > span, time').first().text().trim().toLowerCase();
-            if (dateText.includes('día') || dateText.includes('dias')) {
-                const days = parseInt(dateText.match(/\d+/)?.[0] || '1');
-                if (days > 1) return;
+                if (seenJobIds.has(job.id)) {
+                    // Ya fue notificado antes, no necesitamos la descripción completa
+                    jobs.push({ ...job, description: '' });
+                } else {
+                    // Nuevo → obtener descripción completa desde la página de detalle
+                    const description = await fetchJobDescription(job.url);
+                    jobs.push({ ...job, description });
+                    await new Promise(r => setTimeout(r, 1000));
+                }
             }
 
-            rawJobs.push({ id: `ct_${jobId}`, title, company, url: jobUrl, source: sourceName });
-        });
+            // Pausa entre búsquedas para no saturar ScraperAPI
+            await new Promise(r => setTimeout(r, 2000));
 
-        console.log(`[Scraper] ${sourceName}: ${rawJobs.length} ofertas en página. Obteniendo descripciones completas de nuevas...`);
-
-        // Solo visitar la página de detalle si el job es realmente nuevo (no está en seenJobIds)
-        // Esto ahorra créditos de ScraperAPI evitando visitar páginas de trabajos ya notificados
-        for (const job of rawJobs) {
-            if (seenJobIds.has(job.id)) {
-                // Ya fue visto, no necesitamos bajar la descripción completa
-                jobs.push({ ...job, description: '' });
-            } else {
-                // Es nuevo → visitar página de detalle para obtener texto completo
-                const description = await fetchJobDescription(job.url);
-                jobs.push({ ...job, description });
-                // Pequeña pausa para no abusar de la API
-                await new Promise(r => setTimeout(r, 1000));
+        } catch (error) {
+            console.error(`[Scraper Error] ${sourceName} ('${query}'):`, error.message);
+            if (error.response?.status === 403) {
+                console.error('  -> Bloqueado por 403. Verifica tu SCRAPERAPI_KEY.');
             }
         }
-
-        console.log(`[Scraper] ${sourceName}: Procesadas ${jobs.length} ofertas.`);
-        return jobs;
-    } catch (error) {
-        console.error(`[Scraper Error] ${sourceName}:`, error.message);
-        if (error.response?.status === 403) {
-            console.error('  -> Bloqueado por 403. Verifica tu SCRAPERAPI_KEY.');
-        }
-        return [];
     }
+
+    console.log(`[Scraper] ${sourceName}: ${jobs.length} ofertas procesadas en total.`);
+    return jobs;
 }
 
 module.exports = { scrapeComputrabajo };

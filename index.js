@@ -6,12 +6,29 @@ const { scrapeComputrabajo } = require('./scrapers/computrabajo');
 
 console.log("🤖 AlertasTrabajos Bot Iniciado. Esperando crons...");
 
+// Carga las palabras bloqueadas desde el .env y comprueba si una oferta las contiene
+const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || '')
+    .split(',')
+    .map(w => w.trim().toLowerCase())
+    .filter(Boolean);
+
+function esOfertaBloqueada(job) {
+    if (BLACKLIST.length === 0) return false;
+    const texto = `${job.title} ${job.description}`.toLowerCase();
+    const palabraEncontrada = BLACKLIST.find(palabra => texto.includes(palabra));
+    if (palabraEncontrada) {
+        console.log(`🚫 Oferta bloqueada por palabra '${palabraEncontrada}': ${job.title}`);
+        return true;
+    }
+    return false;
+}
+
 // Función principal que orquesta todo
 async function runAllScrapers() {
     console.log(`\n[${new Date().toLocaleTimeString()}] === INICIANDO RONDA DE BÚSQUEDA ===`);
-    
+
     let allJobs = [];
-    
+
     // Pre-cargar IDs ya vistos para que el scraper de CT no visite páginas de detalle redundantes
     const { getSeenJobsSet } = require('./db/database');
     const seenJobIds = await getSeenJobsSet();
@@ -26,26 +43,32 @@ async function runAllScrapers() {
 
     // Más scrapers se añadirán aquí...
 
-    // 3. Filtrar y notificar
+    // 3. Filtrar por blacklist y notificar
     let nuevas = 0;
+    let bloqueadas = 0;
     for (const job of allJobs) {
+        if (esOfertaBloqueada(job)) {
+            bloqueadas++;
+            // Igual la marcamos como vista para no reprocesarla en el futuro
+            await addJob(job.id);
+            continue;
+        }
         if (!(await isJobSeen(job.id))) {
             if (await addJob(job.id)) {
                 nuevas++;
                 await enviarAlerta(job);
-                // Pausar medio segundo para evitar rate limit de Telegram
-                await new Promise(resolve => setTimeout(resolve, 500)); 
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
     }
 
-    console.log(`=== RONDA FINALIZADA: ${nuevas} ofertas nuevas enviadas ===\n`);
+    console.log(`=== RONDA FINALIZADA: ${nuevas} nuevas enviadas, ${bloqueadas} bloqueadas por blacklist ===\n`);
 }
 
 // Ejecutar una vez al inicio para probar
 runAllScrapers();
 
-// Programar para que corra cada 15 minutos
-cron.schedule('*/15 * * * *', () => {
+// Programar para que corra cada 5 minutos
+cron.schedule('*/5 * * * *', () => {
     runAllScrapers();
 });

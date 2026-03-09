@@ -1,30 +1,67 @@
+// Script de producción: ejecuta TODOS los scrapers una vez y termina.
+// Usado por GitHub Actions (cron) y para pruebas manuales en local.
+
 require('dotenv').config();
-const { addJob, isJobSeen } = require('./db/database');
+const { addJob, isJobSeen, getSeenJobsSet } = require('./db/database');
 const { enviarAlerta } = require('./notifier/telegram');
 const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
+const { scrapeComputrabajo } = require('./scrapers/computrabajo');
+
+// Cargar blacklist de palabras bloqueadas (no sensible, puede ir en el workflow directamente)
+const BLACKLIST = (process.env.BLACKLIST_KEYWORDS || '')
+    .split(',')
+    .map(w => w.trim().toLowerCase())
+    .filter(Boolean);
+
+function esOfertaBloqueada(job) {
+    if (BLACKLIST.length === 0) return false;
+    const texto = `${job.title} ${job.description}`.toLowerCase();
+    const match = BLACKLIST.find(p => texto.includes(p));
+    if (match) {
+        console.log(`🚫 Bloqueada por '${match}': ${job.title}`);
+        return true;
+    }
+    return false;
+}
 
 async function runOnce() {
-    console.log("🧪 [TEST] Ejecutando prueba única del scraper de Telegram...\n");
+    console.log(`\n[${new Date().toLocaleTimeString()}] === INICIANDO RONDA DE BÚSQUEDA ===`);
+    let allJobs = [];
 
-    const jobs = await scrapeTelegramChannel();
+    // Pre-cargar IDs vistos para optimizar llamadas a ScraperAPI en CT
+    const seenJobIds = await getSeenJobsSet();
 
-    console.log(`\n📋 Mensajes que pasaron el filtro de tiempo: ${jobs.length}`);
-    jobs.forEach(j => console.log(`  - [${j.id}] ${j.title.substring(0, 50)}`));
+    // 1. Canal de Telegram
+    const tgJobs = await scrapeTelegramChannel();
+    allJobs = allJobs.concat(tgJobs);
 
+    // 2. Computrabajo
+    const ctJobs = await scrapeComputrabajo(seenJobIds);
+    allJobs = allJobs.concat(ctJobs);
+
+    // 3. Más scrapers se añadirán aquí...
+
+    // 4. Aplicar blacklist, deduplicar y notificar
     let nuevas = 0;
-    for (const job of jobs) {
-        if (await addJob(job.id)) {
-            nuevas++;
-            console.log(`\n📤 Enviando alerta para: ${job.id}`);
-            await enviarAlerta(job);
-            await new Promise(resolve => setTimeout(resolve, 500));
-        } else {
-            console.log(`⏭️  Ya visto antes, saltando: ${job.id}`);
+    let bloqueadas = 0;
+
+    for (const job of allJobs) {
+        if (esOfertaBloqueada(job)) {
+            bloqueadas++;
+            await addJob(job.id); // Marcar como visto para no reprocesar
+            continue;
+        }
+        if (!(await isJobSeen(job.id))) {
+            if (await addJob(job.id)) {
+                nuevas++;
+                await enviarAlerta(job);
+                await new Promise(r => setTimeout(r, 500));
+            }
         }
     }
 
-    console.log(`\n✅ Test finalizado. ${nuevas} alertas nuevas enviadas.`);
-    process.exit(0); // Termina el proceso limpiamente
+    console.log(`=== RONDA FINALIZADA: ${nuevas} nuevas enviadas, ${bloqueadas} bloqueadas ===\n`);
+    process.exit(0); // Necesario para que GitHub Actions no quede colgado
 }
 
 runOnce();
