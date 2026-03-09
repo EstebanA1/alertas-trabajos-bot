@@ -8,6 +8,7 @@ const { enviarAlerta } = require('./notifier/telegram');
 const { scrapeTelegramChannel } = require('./scrapers/telegram_channel');
 const { scrapeComputrabajo } = require('./scrapers/computrabajo');
 const { scrapeLaborum } = require('./scrapers/laborum');
+const { scrapeGetOnBoard } = require('./scrapers/getonboard');
 
 // --- Filtros de keywords ---
 // WHITELIST y BLACKLIST: se leen del entorno o de config.js como fallback
@@ -52,7 +53,10 @@ async function runOnce() {
     // ── 3. Laborum Chile (API interna, sin ScraperAPI, con whitelist) ──
     const laborumJobs = await scrapeLaborum(seenJobIds);
 
-    // ── 4. Más scrapers se añadirán aquí ──
+    // ── 4. GetOnBoard (API pública REST oficial, tech-focused, con whitelist) ──
+    const gobJobs = await scrapeGetOnBoard(seenJobIds);
+
+    // ── 5. Más scrapers se añadirán aquí ──
 
     let nuevas = 0;
     let descartadas = 0;
@@ -62,6 +66,7 @@ async function runOnce() {
         { jobs: tgJobs,       whitelist: false },  // Telegram: sin whitelist
         { jobs: ctJobs,       whitelist: true  },  // CT: con whitelist
         { jobs: laborumJobs,  whitelist: true  },  // Laborum: con whitelist
+        { jobs: gobJobs,      whitelist: true  },  // GetOnBoard: con whitelist
     ];
 
     for (const { jobs, whitelist } of grupos) {
