@@ -12,12 +12,16 @@ async function runAllScrapers() {
     
     let allJobs = [];
     
-    // 1. Scraping Telegram Channel
+    // Pre-cargar IDs ya vistos para que el scraper de CT no visite páginas de detalle redundantes
+    const { getSeenJobsSet } = require('./db/database');
+    const seenJobIds = await getSeenJobsSet();
+
+    // 1. Scraping Telegram Channel (no necesita seenIds, es texto completo en la misma página)
     const tgJobs = await scrapeTelegramChannel();
     allJobs = allJobs.concat(tgJobs);
 
-    // 2. Scraping Computrabajo
-    const ctJobs = await scrapeComputrabajo();
+    // 2. Scraping Computrabajo (pasa seenIds para optimizar créditos de ScraperAPI)
+    const ctJobs = await scrapeComputrabajo(seenJobIds);
     allJobs = allJobs.concat(ctJobs);
 
     // Más scrapers se añadirán aquí...

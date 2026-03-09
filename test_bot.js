@@ -1,5 +1,7 @@
-const TOKEN = "8322025210:AAEghmGN3m3GJjnFik5lCfopscGHv6FaNaE";
-const CHAT_ID = "5099535757";
+require('dotenv').config();
+
+const TOKEN = process.env.TELEGRAM_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function enviarMensaje() {
   const url = `https://api.telegram.org/bot${TOKEN}/sendMessage`;

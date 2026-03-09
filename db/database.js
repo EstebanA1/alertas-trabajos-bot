@@ -71,4 +71,17 @@ async function addJob(jobId) {
     return addJobLocal(jobId);
 }
 
-module.exports = { isJobSeen, addJob };
+// Devuelve un Set con todos los IDs ya vistos (útil para scrapers que necesitan evitar
+// visitar páginas de detalle de trabajos ya procesados)
+async function getSeenJobsSet() {
+    if (redisClient) {
+        const members = await redisClient.smembers('seen_jobs');
+        return new Set(members);
+    }
+    // Modo local
+    initLocalDb();
+    const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    return new Set(data.seenJobs);
+}
+
+module.exports = { isJobSeen, addJob, getSeenJobsSet };

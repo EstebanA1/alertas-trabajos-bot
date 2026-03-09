@@ -2,62 +2,119 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 require('dotenv').config();
 
-async function scrapeComputrabajo() {
-    // Usamos el query de las variables de entorno, por defecto 'desarrollador'
+// ScraperAPI actúa como proxy rotatorio de IPs residenciales.
+function buildScraperApiUrl(targetUrl) {
+    const apiKey = process.env.SCRAPERAPI_KEY;
+    if (!apiKey) {
+        console.warn('[Scraper] SCRAPERAPI_KEY no configurada. Petición directa (puede fallar).');
+        return targetUrl;
+    }
+    return `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(targetUrl)}&country_code=cl`;
+}
+
+// Convierte HTML a texto limpio preservando saltos de línea (igual que telegram_channel.js)
+function htmlToText(html) {
+    if (!html) return '';
+    return html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+// Visita la página individual de la oferta y extrae la descripción completa
+async function fetchJobDescription(jobUrl) {
+    try {
+        const proxyUrl = buildScraperApiUrl(jobUrl);
+        const { data } = await axios.get(proxyUrl, { timeout: 30000 });
+        const $ = cheerio.load(data);
+
+        // Computrabajo pone la descripción completa en #jobDescription o .job-description
+        const descHtml = $('#jobDescription').html()
+            || $('.job-description').html()
+            || $('[data-id="oferta-detalle"]').html()
+            || $('section.box_offer_detail').html()
+            || '';
+
+        return htmlToText(descHtml);
+    } catch (err) {
+        console.warn(`[Scraper] No se pudo obtener descripción completa de: ${jobUrl}`);
+        return '';
+    }
+}
+
+async function scrapeComputrabajo(seenJobIds = new Set()) {
     const query = process.env.CT_QUERY || 'desarrollador';
-    
-    // URL base de búsqueda en Chile ordenado por fecha (pubdate) para obtener lo más reciente
-    const url = `https://cl.computrabajo.com/trabajo-de-${query}?by=pubdate`;
+    const targetUrl = `https://cl.computrabajo.com/trabajo-de-${query}?by=pubdate`;
+    const listingUrl = buildScraperApiUrl(targetUrl);
     const sourceName = 'Computrabajo Chile';
     const jobs = [];
 
     try {
         console.log(`[Scraper] Buscando en ${sourceName} con término '${query}'...`);
-        
-        // Simular un User-Agent real para evitar bloqueos simples
-        const { data } = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
-            }
-        });
-
+        const { data } = await axios.get(listingUrl, { timeout: 30000 });
         const $ = cheerio.load(data);
 
-        // Seleccionar los artículos que contienen las ofertas (clase común en CT)
-        $('article.box_offer').each((i, el) => {
-            // El ID suele venir en el atributo data-id
+        // Recopilar primero los trabajos básicos del listado
+        const rawJobs = [];
+        $('article[data-id]').each((i, el) => {
             const jobId = $(el).attr('data-id');
             if (!jobId) return;
 
-            const titleElement = $(el).find('h2.tO a');
-            const title = titleElement.text().trim();
-            const linkPath = titleElement.attr('href');
-            const urlCompleta = linkPath ? `https://cl.computrabajo.com${linkPath}` : url;
+            const titleEl = $(el).find('h2 a, .js-o-link');
+            const title = titleEl.first().text().trim();
+            if (!title) return;
 
-            const company = $(el).find('p.empr a').text().trim() || $(el).find('p.empr').text().trim();
-            
-            // Descripción corta
-            const description = $(el).find('p.dO').text().trim();
+            const linkPath = titleEl.first().attr('href');
+            const jobUrl = linkPath
+                ? (linkPath.startsWith('http') ? linkPath : `https://cl.computrabajo.com${linkPath}`)
+                : targetUrl;
 
-            jobs.push({
-                id: `ct_${jobId}`,
-                title: title,
-                company: company,
-                url: urlCompleta,
-                source: sourceName,
-                description: description
-            });
+            const company = $(el).find('[data-company-name], p.dV a').first().text().trim()
+                || $(el).find('p.dV').first().text().trim();
+
+            // Filtro de tiempo: "Hace X días" → ignorar si X > 1
+            const dateText = $(el).find('.pb5 > span, time').first().text().trim().toLowerCase();
+            if (dateText.includes('día') || dateText.includes('dias')) {
+                const days = parseInt(dateText.match(/\d+/)?.[0] || '1');
+                if (days > 1) return;
+            }
+
+            rawJobs.push({ id: `ct_${jobId}`, title, company, url: jobUrl, source: sourceName });
         });
 
-        console.log(`[Scraper] ${sourceName}: Encontradas ${jobs.length} ofertas en la primera página.`);
+        console.log(`[Scraper] ${sourceName}: ${rawJobs.length} ofertas en página. Obteniendo descripciones completas de nuevas...`);
+
+        // Solo visitar la página de detalle si el job es realmente nuevo (no está en seenJobIds)
+        // Esto ahorra créditos de ScraperAPI evitando visitar páginas de trabajos ya notificados
+        for (const job of rawJobs) {
+            if (seenJobIds.has(job.id)) {
+                // Ya fue visto, no necesitamos bajar la descripción completa
+                jobs.push({ ...job, description: '' });
+            } else {
+                // Es nuevo → visitar página de detalle para obtener texto completo
+                const description = await fetchJobDescription(job.url);
+                jobs.push({ ...job, description });
+                // Pequeña pausa para no abusar de la API
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        console.log(`[Scraper] ${sourceName}: Procesadas ${jobs.length} ofertas.`);
         return jobs;
     } catch (error) {
-        // Manejar posibles errores (como bloqueos 403)
         console.error(`[Scraper Error] ${sourceName}:`, error.message);
-        if (error.response && error.response.status === 403) {
-            console.error("  -> CT está bloqueando la petición por falta de Captcha o cabeceras insuficientes. Posible uso de Puppeteer requerido en el futuro.");
+        if (error.response?.status === 403) {
+            console.error('  -> Bloqueado por 403. Verifica tu SCRAPERAPI_KEY.');
         }
         return [];
     }
