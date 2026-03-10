@@ -29,8 +29,9 @@ function matchPalabra(texto, palabra) {
     return regex.test(texto);
 }
 
-// Captura experiencia >= 3 años en cualquier formato:
-const EXP_REGEX = /(?:experiencia(?:\s+\w+){0,4}\s+(?:de\s+)?|mínimo\s+|al\s+menos\s+|sobre\s+)?([3-9]|\d{2,})\s*\+?\s*años(?:\s+(?:de\s+)?(?:experiencia|trayectoria)|\s+en\s+(?:cargos?|roles?|el\s+cargo))?/;
+// Acepta: "3+ años", "3 años de experiencia", "experiencia de 3 años", "mínimo 3 años", "3 años en cargos/roles"
+// "trayectoria" excluida: las empresas la usan para su propia antigüedad ("60 años de trayectoria")
+const EXP_REGEX = /(?:experiencia(?:\s+\w+){0,5}\s+(?:de\s+)?([3-9]|\d{2,})\s*\+?\s*años|(?:mínimo|al\s+menos|sobre)\s+([3-9]|\d{2,})\s*\+?\s*años|([3-9]|\d{2,})\+\s*años|([3-9]|\d{2,})\s*años\s+de\s+experiencia|([3-9]|\d{2,})\s*años\s+en\s+(?:cargos?|roles?|el\s+cargo))/;
 
 function tieneExpExcesiva(texto) {
     const match = texto.match(EXP_REGEX);
