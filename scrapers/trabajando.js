@@ -61,8 +61,9 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                 if (seenInThisRun.has(jobId)) continue;
                 seenInThisRun.add(jobId);
 
-                // /empleo/id/{id} redirige a la oferta correcta y funciona en la app móvil
-                const jobUrl = `https://www.trabajando.cl/empleo/id/${item.idOferta}`;
+                // Trabajando.cl ahora usa el título del cargo codificado en la URL de oferta
+                const cargoEncode = encodeURIComponent(item.nombreCargo?.trim() || '');
+                const jobUrl = `https://www.trabajando.cl/trabajo-empleo/${cargoEncode}`;
 
                 let description = '';
                 let aniosExp = null;
