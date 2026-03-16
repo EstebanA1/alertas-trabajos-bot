@@ -1,33 +1,42 @@
-const { createUser, updateUserState } = require('../../db/database');
+const { createUser, getUser, getUserConfig, resetUserConfiguration, startUserConfigDraft, updateUserState } = require('../../db/database');
+const { buildPortalKeyboard, buildStartMenuKeyboard, hasConfiguredData, formatUserConfig } = require('../wizard');
+
+async function sendPortalSelection(bot, chatId, selectedPortals = []) {
+    const welcomeText = `🚀 *¡Hola! Misión: encontrarte trabajo.*
+
+Soy un bot personalizable. Buscaré ofertas para ti cada 5 minutos y te avisaré apenas encuentre algo que calce con tus filtros.
+
+*Paso 1: ¿De qué plataformas quieres recibir alertas?*
+Marca una o más opciones y luego presiona *Continuar*.`;
+
+    return bot.sendMessage(chatId, welcomeText, {
+        parse_mode: 'Markdown',
+        reply_markup: buildPortalKeyboard(selectedPortals),
+    });
+}
 
 async function handleStart(bot, msg) {
     const chatId = msg.chat.id.toString();
-    
-    // Crear el usuario o resetearlo si ya existía
+
     await createUser(chatId);
+    const user = await getUser(chatId);
+    const config = await getUserConfig(chatId);
+
+    if (user && (user.active || hasConfiguredData(config))) {
+        return bot.sendMessage(
+            chatId,
+            `${formatUserConfig(config || {}, { active: Boolean(user.active) })}\n\n¿Qué quieres hacer ahora?`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: buildStartMenuKeyboard(),
+            }
+        );
+    }
+
+    await resetUserConfiguration(chatId);
+    await startUserConfigDraft(chatId);
     await updateUserState(chatId, 'AWAITING_PORTALS');
-    
-    const welcomeText = `🚀 *¡Hola! Misión: Encontrarte trabajo.*
-    
-Soy un bot personalizable. Buscaré ofertas para ti cada 5 minutos y te avisaré de inmediato.
-
-*Paso 1: ¿De qué portales quieres recibir ofertas?*
-Selecciona los portales usando los botones abajo y luego presiona "Continuar".`;
-
-    const opts = {
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: "✅ GetOnBoard", callback_data: "portal_toggle_getonboard" }],
-                [{ text: "✅ Laborum", callback_data: "portal_toggle_laborum" }],
-                [{ text: "✅ Trabajando", callback_data: "portal_toggle_trabajando" }],
-                [{ text: "❌ Computrabajo", callback_data: "portal_toggle_computrabajo" }],
-                [{ text: "⏭️ Continuar", callback_data: "portal_continue" }]
-            ]
-        }
-    };
-
-    bot.sendMessage(chatId, welcomeText, opts);
+    return sendPortalSelection(bot, chatId, []);
 }
 
-module.exports = { handleStart };
+module.exports = { handleStart, sendPortalSelection };

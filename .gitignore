@@ -1,3 +1,7 @@
 node_modules/
 .env
 db/jobs.json
+.serena/
+logs/
+db/database.sqlite-wal
+db/database.sqlite-shm

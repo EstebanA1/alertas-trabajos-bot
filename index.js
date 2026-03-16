@@ -1,10 +1,11 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
-const { getDB, getUserConfig } = require('./db/database');
+const { activateUser, getDB, getUser, getUserConfig, getUserDraftConfig, startUserConfigDraft, updateUserState } = require('./db/database');
 const { handleStart } = require('./bot/handlers/start');
 const { handleMessage } = require('./bot/handlers/messages');
 const { handleCallbackQuery } = require('./bot/handlers/callbacks');
+const { buildEditMenuKeyboard, formatUserConfig } = require('./bot/wizard');
 
 const token = process.env.TELEGRAM_TOKEN;
 if (!token) {
@@ -25,25 +26,75 @@ getDB().then(() => {
 // Comandos Principales
 bot.onText(/^\/start$/, (msg) => handleStart(bot, msg));
 
-bot.onText(/^\/config$/, async (msg) => {
+bot.onText(/^\/edit$/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const config = await getUserConfig(chatId);
+
+    if (!config) {
+        return bot.sendMessage(chatId, '⚠️ Aún no tienes configuración. Usa /start para comenzar.', { parse_mode: 'Markdown' });
+    }
+
+    await activateUser(chatId, 0);
+    const draft = await startUserConfigDraft(chatId);
+    await updateUserState(chatId, 'AWAITING_CONFIRMATION');
+
+    return bot.sendMessage(chatId, '✏️ *Modo edición activado.*\n\nTus alertas quedan pausadas hasta que confirmes los cambios.', {
+        parse_mode: 'Markdown',
+    }).then(() => bot.sendMessage(chatId, '✏️ *¿Qué quieres editar?*', {
+        parse_mode: 'Markdown',
+        reply_markup: buildEditMenuKeyboard(draft || config),
+    }));
+});
+
+bot.onText(/^\/pause$/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    const user = await getUser(chatId);
+
+    if (!user) {
+        return bot.sendMessage(chatId, '⚠️ Aún no tienes configuración. Usa /start para comenzar.', { parse_mode: 'Markdown' });
+    }
+
+    await activateUser(chatId, 0);
+    await updateUserState(chatId, 'ACTIVE');
+    return bot.sendMessage(chatId, '⏸️ *Alertas pausadas.*\n\nTu configuración sigue guardada. Usa /resume para reactivar las notificaciones.', {
+        parse_mode: 'Markdown',
+    });
+});
+
+bot.onText(/^\/resume$/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    const [user, config] = await Promise.all([getUser(chatId), getUserConfig(chatId)]);
+
+    if (!user || !config) {
+        return bot.sendMessage(chatId, '⚠️ Aún no tienes configuración. Usa /start para comenzar.', { parse_mode: 'Markdown' });
+    }
+
+    if (!config.queries?.length) {
+        return bot.sendMessage(chatId, '⚠️ No pude reactivar tus alertas porque faltan queries. Usa /edit para completar la configuración.', {
+            parse_mode: 'Markdown',
+        });
+    }
+
+    await activateUser(chatId, 1);
+    await updateUserState(chatId, 'ACTIVE');
+    return bot.sendMessage(chatId, '▶️ *Alertas reactivadas.*\n\nVolverás a recibir notificaciones en el próximo ciclo del bot.', {
+        parse_mode: 'Markdown',
+    });
+});
+
+bot.onText(/^\/config$/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    const [user, config, draft] = await Promise.all([getUser(chatId), getUserConfig(chatId), getUserDraftConfig(chatId)]);
     
     if (!config) {
         return bot.sendMessage(chatId, "⚠️ Aún no tienes configuración. Usa /start para inicializar el bot.");
     }
-    
-    const texto = `⚙️ *Tu Configuración Actual*\n
-*Portales*: ${(config.portals || []).join(', ') || 'Ninguno'}
-*Cargos*: ${(config.queries || []).join(', ') || 'Todos'}
-*Requisitos (Whitelist)*: ${(config.whitelist || []).join(', ') || 'Ninguno'}
-*Tolerado (Soft Blacklist)*: ${(config.blacklist_soft || []).join(', ') || 'Ninguno'}
-*Prohibido (Hard Blacklist)*: ${(config.blacklist_hard || []).join(', ') || 'Ninguno'}
-${config.portals?.includes('computrabajo') ? `*API Key ScraperAPI*: ${config.scraperapi_key ? '✅ Guardada' : '❌ Falta'}` : ''}
 
-Para cambiar estos valores, escribe /start de nuevo.`;
+    const draftNotice = draft ? '\n\n📝 Tienes un borrador pendiente de confirmar (usa /edit para revisarlo).' : '';
 
-    bot.sendMessage(chatId, texto, { parse_mode: 'Markdown' });
+    return bot.sendMessage(chatId, `${formatUserConfig(config, { active: Boolean(user?.active) })}${draftNotice}\n\nPara cambiar estos valores, usa /edit o /start. También puedes usar /pause y /resume.`, {
+        parse_mode: 'Markdown',
+    });
 });
 
 // Respuestas al Wizard
@@ -54,13 +105,37 @@ bot.on('callback_query', (query) => handleCallbackQuery(bot, query));
 
 // --- CRON DE SCRAPING CENTRALIZADO ---
 const { runScraperCycle } = require('./scraper/runner');
+const tz = process.env.BOT_TIMEZONE || 'America/Santiago';
 cron.schedule('*/5 * * * *', async () => {
     console.log("--- ⏰ Iniciando ciclo programado de scraping (Cada 5 min) ---");
-    await runScraperCycle(bot);
+    try {
+        await runScraperCycle(bot);
+    } catch (err) {
+        console.error('❌ Error no controlado en ciclo de scraping:', err.message);
+    }
+}, {
+    timezone: tz,
+    noOverlap: true,
 });
-console.log("⏰ Tarea cron de 5 minutos registrada.");
+console.log(`⏰ Tarea cron de 5 minutos registrada (TZ=${tz}, noOverlap=true).`);
 
 // Manejo de errores
-bot.on("polling_error", (err) => console.log(`[Polling Error]`, err));
+bot.on('polling_error', (err) => {
+    console.error(`[Polling Error ${err.code || 'UNKNOWN'}]`, err.message || err);
+});
+
+async function shutdown(signal) {
+    console.log(`🛑 Señal ${signal} recibida. Cerrando bot...`);
+    try {
+        await bot.stopPolling({ cancel: true, reason: signal });
+    } catch (err) {
+        console.error('Error al detener polling:', err.message);
+    } finally {
+        process.exit(0);
+    }
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 module.exports = { bot };

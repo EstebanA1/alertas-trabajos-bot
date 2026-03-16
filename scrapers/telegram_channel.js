@@ -1,7 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-async function scrapeTelegramChannel() {
+async function scrapeTelegramChannel(maxAgeDays = 1) {
     const url = 'https://t.me/s/DCCEmpleoSinFiltro';
     const sourceName = 'DCCEmpleoSinFiltro (Telegram)';
     const jobs = [];
@@ -34,8 +34,8 @@ async function scrapeTelegramChannel() {
             const timeElement = $(el).find('time').attr('datetime');
             if (timeElement) {
                 const messageDate = new Date(timeElement);
-                const hoursDifference = (new Date() - messageDate) / (1000 * 60 * 60);
-                if (hoursDifference > 24) return;
+                const daysDifference = (new Date() - messageDate) / (1000 * 60 * 60 * 24);
+                if (daysDifference > maxAgeDays) return;
             }
 
             const link = `https://t.me/${messageId}`;
@@ -48,6 +48,7 @@ async function scrapeTelegramChannel() {
                 url: link,
                 source: sourceName,
                 description: textContent,
+                publishedAt: timeElement ? new Date(timeElement).getTime() : null,
             });
         });
 

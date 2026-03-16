@@ -1,126 +1,130 @@
 # Alertas Trabajos Bot 🤖
 
-Bot de Telegram que busca ofertas de empleo en múltiples portales chilenos cada 5 minutos y envía alertas automáticas al chat. Se ejecuta sin servidor mediante **GitHub Actions** y persiste el estado usando **Upstash Redis**.
+Bot de Telegram multiusuario para detectar anuncios laborales en portales y canales, filtrar por perfil técnico y avisar rápido para postular antes.
+
+## Estado actual
+
+- Modo principal: multiusuario con wizard en Telegram (`/start`) y configuración por usuario.
+- Persistencia: SQLite local (`db/database.sqlite`) para estado de usuarios y deduplicación por usuario.
+- Scheduler: cron interno cada 5 minutos (sin GitHub Actions), pensado para correr 24/7 en Debian LXC.
+- Compatibilidad: se mantienen scripts legacy (`test_scraper.js`) para pruebas rápidas de scraping single-user.
 
 ## Arquitectura
 
 ```
-GitHub Actions (cron cada 5 min)
-        │
-        ▼
-  test_scraper.js          ← Punto de entrada principal
-        │
-        ├── scrapers/
-        │   ├── computrabajo.js   ← ScraperAPI (proxy residencial)
-        │   ├── laborum.js        ← API interna (sin proxy)
-        │   ├── getonboard.js     ← API REST pública oficial
-        │   └── telegram_channel.js ← Canal DCCEmpleoSinFiltro
-        │
-        ├── utils/html.js         ← htmlToText compartido entre scrapers
-        ├── db/database.js        ← Dual: Redis (nube) o JSON (local)
-        └── notifier/telegram.js  ← Envío de alertas al chat
+index.js (bot polling + cron cada 5 min)
+    ├── bot/handlers/            # Wizard de configuración por chat
+    ├── scraper/runner.js        # Orquestación central de scrapers
+    ├── scrapers/                # Extracción por portal/canal
+    ├── notifier/telegram.js     # Formateo y envío por usuario
+    └── db/database.js           # API de datos (SQLite)
+                 └── db/schema.js      # Esquema y utilidades SQL
 ```
 
-## Flujo de ejecución
+## Flujo multiusuario
 
-1. Se obtienen todos los IDs ya vistos desde Redis.
-2. Cada scraper recupera las ofertas publicadas en las últimas 24h.
-3. Las ofertas pasan por filtros de **blacklist** (se descarta) y **whitelist** (debe coincidir con alguna tecnología de interés).
-4. Las ofertas nuevas que superan los filtros se marcan en Redis y se envían como mensaje Telegram.
+1. Usuario inicia con `/start` y define portales/filtros.
+2. Bot guarda estado y configuración por `chat_id` en SQLite.
+3. Cada 5 min, `runner` obtiene usuarios activos.
+4. Descarga pools compartidos (Telegram, Laborum, GetOnBoard, Trabajando) y Computrabajo por usuario si tiene `scraperapi_key`.
+5. Aplica filtros personalizados (whitelist, blacklist hard/soft, experiencia).
+6. Evita duplicados por usuario con `seen_jobs` y envía alertas.
 
-> El canal de Telegram (`DCCEmpleoSinFiltro`) **no aplica whitelist** — se reenvía todo el contenido del canal.
+### Comandos del bot
+
+- `/start`: inicia el wizard o, si ya existe configuración, muestra menú para editar o reiniciar.
+- `/config`: muestra el resumen actual de la configuración.
+- `/edit`: pausa alertas y abre edición granular de la configuración.
+- `/pause`: pausa temporalmente las alertas sin borrar la configuración.
+- `/resume`: reactiva las alertas guardadas.
+
+### Wizard actual
+
+- Selección de portales con botones inline.
+- `Computrabajo` queda bloqueado hasta que el usuario entregue su `ScraperAPI key`.
+- Captura de queries, whitelist, blacklist soft y blacklist hard.
+- Resumen final con confirmación antes de dejar al usuario activo.
+- Si el usuario entra en modo edición, las alertas quedan pausadas hasta confirmar cambios.
 
 ## Portales soportados
 
-| Portal | Método | Proxy requerido |
+| Portal | Método | Requisito |
 |---|---|---|
-| Computrabajo Chile | HTML scraping con Cheerio | ✅ ScraperAPI |
-| Laborum Chile | API interna REST | ❌ |
-| GetOnBoard | API REST pública | ❌ |
-| DCCEmpleoSinFiltro | Web Telegram (`t.me/s/`) | ❌ |
+| Computrabajo Chile | HTML scraping + proxy | ScraperAPI por usuario |
+| Laborum Chile | API interna REST | Ninguno |
+| GetOnBoard | API pública | Ninguno |
+| Trabajando.cl | API interna + detalle | Ninguno |
+| DCCEmpleoSinFiltro | Web Telegram (`t.me/s/`) | Ninguno |
 
-## Configuración
+## Variables de entorno
 
-### Variables de entorno
+Copia `.env.example` a `.env`.
 
-Copia `.env.example` a `.env` para desarrollo local:
-
-| Variable | Descripción |
+| Variable | Uso |
 |---|---|
-| `TELEGRAM_TOKEN` | Token del bot (obtenido via [@BotFather](https://t.me/BotFather)) |
-| `TELEGRAM_CHAT_ID` | ID del chat/grupo donde se envían las alertas |
-| `UPSTASH_REDIS_REST_URL` | URL REST de tu instancia Upstash Redis |
-| `UPSTASH_REDIS_REST_TOKEN` | Token de autenticación Upstash |
-| `SCRAPERAPI_KEY` | API key de [ScraperAPI](https://www.scraperapi.com/) (necesaria para Computrabajo) |
+| `TELEGRAM_TOKEN` | Obligatoria. Token del bot |
+| `BOT_TIMEZONE` | Opcional. Ej: `America/Santiago` |
+| `SCRAPERAPI_KEY` | Opcional. Fallback global legacy |
+| `CT_QUERY` | Opcional. Queries por defecto legacy |
+| `TELEGRAM_CHAT_ID` | Solo modo legacy (`test_scraper.js`) |
 
-> En **desarrollo local** sin Redis configurado, el bot usa un archivo `db/jobs.json` como base de datos.
+Notas:
+- En modo multiusuario, cada usuario puede guardar su propia `scraperapi_key` en el wizard.
+- En modo legacy, `TELEGRAM_CHAT_ID` sigue siendo requerido para envío a un chat fijo.
 
-### Personalización de búsquedas (`config.js`)
-
-```js
-CT_QUERY: 'desarrollador,programador,fullstack'   // Términos de búsqueda
-WHITELIST_KEYWORDS: 'javascript,react,python,...' // La oferta DEBE incluir al menos uno
-BLACKLIST_KEYWORDS: 'java,php,call center,...'     // Descarta la oferta si incluye alguno
-```
-
-Las variables `CT_QUERY`, `WHITELIST_KEYWORDS` y `BLACKLIST_KEYWORDS` también pueden definirse en el entorno para sobreescribir los valores de `config.js`.
-
-## Instalación y uso local
+## Ejecutar local
 
 ```bash
 npm install
 
-# Probar el bot (envía un mensaje de prueba a Telegram)
-node test_bot.js
+# Modo principal (multiusuario)
+npm start
 
-# Ejecutar una ronda completa de scraping
-node test_scraper.js
+# Modo legacy (single-user, útil para diagnóstico rápido)
+npm run start:legacy
 ```
 
-## Despliegue en GitHub Actions
+## Despliegue en Debian LXC (Proxmox)
 
-El workflow `.github/workflows/scraper.yml` ejecuta `test_scraper.js` cada 5 minutos de forma automática.
+Se recomienda PM2 para mantener el proceso vivo y reiniciar en reboot.
 
-### Secrets requeridos en el repositorio
+```bash
+# dentro del LXC
+npm install
+npm install -g pm2
 
-Ve a **Settings → Secrets and variables → Actions** y agrega:
-
-- `TELEGRAM_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `SCRAPERAPI_KEY`
-
-> El workflow también puede ejecutarse manualmente desde la pestaña **Actions** usando `workflow_dispatch`.
-
-## Estructura de archivos
-
-```
-├── config.js                  # Términos de búsqueda y listas de filtro
-├── test_scraper.js            # Punto de entrada (usado por GitHub Actions)
-├── test_bot.js                # Script de prueba de conexión Telegram
-├── utils/
-│   └── html.js                # Utilidad htmlToText compartida
-├── db/
-│   └── database.js            # Capa de persistencia (Redis / JSON local)
-├── notifier/
-│   └── telegram.js            # Formatea y envía mensajes al bot
-├── scrapers/
-│   ├── computrabajo.js
-│   ├── laborum.js
-│   ├── getonboard.js
-│   └── telegram_channel.js
-└── .github/workflows/
-    └── scraper.yml            # Workflow de GitHub Actions
+mkdir -p logs
+pm2 start ecosystem.config.js --env production
+pm2 save
+pm2 startup systemd
 ```
 
-## Dependencias principales
+Comandos útiles:
 
-| Paquete | Uso |
-|---|---|
-| `axios` | Peticiones HTTP |
-| `cheerio` | Parsing HTML (Computrabajo, Telegram) |
-| `@upstash/redis` | Persistencia en nube (serverless-compatible) |
-| `node-telegram-bot-api` | Envío de mensajes Telegram |
-| `dotenv` | Carga de variables de entorno |
-| `node-cron` | Scheduler interno (solo para `index.js`) |
+```bash
+pm2 status
+pm2 logs alertastrabajos-bot
+pm2 restart alertastrabajos-bot
+pm2 stop alertastrabajos-bot
+```
+
+## Robustez aplicada
+
+- `node-cron` con `noOverlap: true` y zona horaria configurable.
+- Control de ejecución concurrente en `runner` para evitar ciclos duplicados.
+- `SQLite WAL + busy_timeout` para menor contención en escrituras.
+- Manejo de señales `SIGINT/SIGTERM` para cierre limpio de polling.
+- API de scrapers con firma compatible para modo legacy y multiusuario.
+
+## Estructura relevante
+
+```
+index.js
+scraper/runner.js
+db/database.js
+db/schema.js
+notifier/telegram.js
+scrapers/*.js
+ecosystem.config.js
+.env.example
+```

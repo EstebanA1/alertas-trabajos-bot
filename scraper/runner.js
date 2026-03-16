@@ -16,30 +16,55 @@ function matchPalabra(texto, palabra) {
     return regex.test(texto);
 }
 
-const EXP_REGEX = /(?:experiencia(?:\s+\w+){0,5}\s+(?:de\s+)?([3-9]|\d{2,})\s*\+?\s*años|(?:mínimo|al\s+menos|sobre)\s+([3-9]|\d{2,})\s*\+?\s*años|([3-9]|\d{2,})\+\s*años|([3-9]|\d{2,})\s*años\s+de\s+experiencia|([3-9]|\d{2,})\s*años\s+en\s+(?:cargos?|roles?|el\s+cargo))/;
+const EXP_REGEX_CACHE = new Map();
 
-function tieneExpExcesiva(texto) {
-    return EXP_REGEX.test(texto);
+function buildExpRegex(threshold) {
+    if (EXP_REGEX_CACHE.has(threshold)) return EXP_REGEX_CACHE.get(threshold);
+    // Coincide con n+ años donde n >= threshold
+    const digitPattern = threshold < 10
+        ? `([${threshold}-9]|\\d{2,})`
+        : `(\\d{2,})`;
+    const r = new RegExp(
+        `(?:experiencia(?:\\s+\\w+){0,5}\\s+(?:de\\s+)?${digitPattern}\\s*\\+?\\s*años` +
+        `|(?:mínimo|al\\s+menos|sobre)\\s+${digitPattern}\\s*\\+?\\s*años` +
+        `|${digitPattern}\\+\\s*años` +
+        `|${digitPattern}\\s*años\\s+de\\s+experiencia` +
+        `|${digitPattern}\\s*años\\s+en\\s+(?:cargos?|roles?|el\\s+cargo))`,
+        'i'
+    );
+    EXP_REGEX_CACHE.set(threshold, r);
+    return r;
+}
+
+function tieneExpExcesiva(texto, threshold) {
+    if (threshold == null) return false;
+    return buildExpRegex(threshold).test(texto);
 }
 
 function pasaFiltros(job, config, isTelegram = false) {
     const texto = `${job.title} ${job.description}`.toLowerCase();
 
-    // 1. Experiencia Excesiva (descarte absoluto)
-    if (tieneExpExcesiva(texto)) return false;
+    // 1. Experiencia numérica directa (Trabajando.cl) — más fiable que el regex
+    if (job.requiredYears != null && config.years_experience != null) {
+        if (job.requiredYears > config.years_experience) return false;
+    }
 
-    // 2. Blacklist Hard (descarte inmediato con 1 hit)
+    // 2. Experiencia excesiva (regex en texto) — threshold = user.years_experience + 1
+    const expThreshold = config.years_experience != null ? config.years_experience + 1 : null;
+    if (tieneExpExcesiva(texto, expThreshold)) return false;
+
+    // 3. Blacklist Hard (descarte inmediato con 1 hit)
     const hardHit = (config.blacklist_hard || []).find(p => matchPalabra(texto, p));
     if (hardHit) return false;
 
-    // 3. Blacklist Soft (tolerancia hasta 2 hits)
+    // 4. Blacklist Soft (tolerancia hasta 2 hits)
     const softHits = (config.blacklist_soft || []).filter(p => matchPalabra(texto, p));
     if (softHits.length > SOFT_TOLERANCE) return false;
 
-    // 4. Whitelist (solo si no es Telegram y hay lista configurada)
+    // 5. Whitelist (solo si no es Telegram y hay lista configurada)
     if (!isTelegram && config.whitelist && config.whitelist.length > 0) {
         const coincide = config.whitelist.find(p => matchPalabra(texto, p));
-        if (!coincide) return false; // Debe coincidir al menos 1
+        if (!coincide) return false;
     }
 
     return true;
@@ -47,6 +72,26 @@ function pasaFiltros(job, config, isTelegram = false) {
 
 // Queries genéricas para los portales libres si no se extraen por usuario
 const DEFAULT_QUERIES = ['desarrollador', 'programador', 'ingeniero informatico', 'fullstack', 'backend', 'frontend'];
+
+function buildSharedQueries(usersConfig) {
+    const dynamic = Object.values(usersConfig)
+        .flatMap((conf) => Array.isArray(conf?.queries) ? conf.queries : [])
+        .map((q) => String(q).trim().toLowerCase())
+        .filter(Boolean);
+
+    const base = dynamic.length > 0 ? dynamic : DEFAULT_QUERIES;
+    return [...new Set(base)];
+}
+
+function matchesQueries(job, queries = []) {
+    if (!Array.isArray(queries) || queries.length === 0) return false;
+    const texto = `${job.title} ${job.description}`.toLowerCase();
+    return queries.some((query) => {
+        const normalized = String(query || '').trim().toLowerCase();
+        if (!normalized) return false;
+        return texto.includes(normalized);
+    });
+}
 
 let isScraping = false;
 
@@ -69,30 +114,32 @@ async function runScraperCycle(bot) {
             usersConfig[u.chat_id] = await getUserConfig(u.chat_id);
         }
 
+        const sharedQueries = buildSharedQueries(usersConfig);
+
+        // Calcular ventana máxima entre todos los usuarios (para scrapers centralizados)
+        const maxAgeDays = Math.max(...Object.values(usersConfig).map(c => c.days_lookback || 1));
+
         const timestamp = () => `[${new Date().toLocaleTimeString()}]`;
 
         // 1. Búsqueda Centralizada (Portales Libres)
         console.log(`${timestamp()} === DESCARGANDO OFERTAS CENTRALES ===`);
         
         let tgJobs = [];
-        try { tgJobs = await scrapeTelegramChannel(); } catch(e) { console.error("Error scrapeando Telegram:", e.message); }
+        try { tgJobs = await scrapeTelegramChannel(maxAgeDays); } catch(e) { console.error("Error scrapeando Telegram:", e.message); }
         
-        // Asumiendo que internamente ya tienen Set para intra-run duplicates. Podemos inyectarlo o ignorarlo.
-        // Aquí pasamos las default queries para barrer todo el mercado genérico sin sobrecargar las APIs
         let laborumJobs = [], gobJobs = [], trabajandoJobs = [];
-        try { laborumJobs = await scrapeLaborum(DEFAULT_QUERIES, new Set()); } catch(e) { console.error(e.message); }
-        try { gobJobs = await scrapeGetOnBoard(DEFAULT_QUERIES, new Set()); } catch(e) { console.error(e.message); }
-        try { trabajandoJobs = await scrapeTrabajandog(DEFAULT_QUERIES, new Set()); } catch(e) { console.error(e.message); }
+        try { laborumJobs = await scrapeLaborum(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
+        try { gobJobs = await scrapeGetOnBoard(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
+        try { trabajandoJobs = await scrapeTrabajandog(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
 
         // 2. Evaluamos y notificamos Usuario por Usuario
         for (const chatId of Object.keys(usersConfig)) {
-            const conf = usersConfig[chatId];
+            const conf = usersConfig[chatId] || {};
             const portals = conf.portals || [];
             let userJobs = [];
 
             // A. Agregar los del pool central si el usuario quiere ese portal
-            // El canal de Telegram viene siempre incluido para todos por la directriz original
-            userJobs.push(...tgJobs);
+            if (portals.includes('telegram')) userJobs.push(...tgJobs);
 
             if (portals.includes('laborum')) userJobs.push(...laborumJobs);
             if (portals.includes('getonboard')) userJobs.push(...gobJobs);
@@ -103,7 +150,7 @@ async function runScraperCycle(bot) {
             if (portals.includes('computrabajo') && conf.scraperapi_key && conf.queries && conf.queries.length > 0) {
                 try {
                     console.log(`[BYOK] Scrapeando Computrabajo para el usuario ${chatId}...`);
-                    const ctJobs = await scrapeComputrabajo(conf.queries, conf.scraperapi_key, new Set());
+                    const ctJobs = await scrapeComputrabajo(conf.queries, conf.scraperapi_key, new Set(), conf.days_lookback || 1);
                     userJobs.push(...ctJobs);
                 } catch(e) {
                     console.error(`Error CT Usuario ${chatId}: ${e.message}`);
@@ -112,9 +159,21 @@ async function runScraperCycle(bot) {
 
             // C. Filtrado Personalizado y Envío
             let enviadas = 0, descartadas = 0;
+            const userQueries = Array.isArray(conf.queries) ? conf.queries : [];
             
             for (const job of userJobs) {
-                const isTg = job.source === 'DCCEmpleoSinFiltro'; // u otro nombre asignado en tu scraper
+                const isTg = String(job.source || '').toLowerCase().includes('telegram');
+
+                if (!isTg && !matchesQueries(job, userQueries)) {
+                    continue;
+                }
+
+                // Filtro de ventana de tiempo per-user (scrapers centrales usan la máxima, pero
+                // usuarios con ventana menor no deben recibir ofertas más antiguas que su config)
+                const userWindow = (conf.days_lookback || 1) * 24 * 60 * 60 * 1000;
+                if (job.publishedAt && job.publishedAt < Date.now() - userWindow) {
+                    continue;
+                }
 
                 if (!pasaFiltros(job, conf, isTg)) {
                     descartadas++;

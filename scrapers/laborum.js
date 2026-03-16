@@ -7,16 +7,30 @@ const { htmlToText } = require('../utils/html');
 const LABORUM_API = 'https://www.laborum.cl/api/avisos/searchV2';
 const SOURCE_NAME = 'Laborum Chile';
 
-function esReciente(fechaIso) {
+function esReciente(fechaIso, maxAgeDays = 1) {
     if (!fechaIso) return true;
     const publicado = new Date(fechaIso);
-    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return publicado >= hace24h;
+    const limite = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+    return publicado >= limite;
 }
 
-async function scrapeLaborum(seenJobIds = new Set()) {
-    const queries = (process.env.CT_QUERY || config.CT_QUERY)
-        .split(',').map(q => q.trim()).filter(Boolean);
+function resolveArgs(arg1, arg2) {
+    if (Array.isArray(arg1)) {
+        return {
+            queries: arg1.map(q => String(q).trim()).filter(Boolean),
+            seenJobIds: arg2 instanceof Set ? arg2 : new Set(),
+        };
+    }
+
+    return {
+        queries: (process.env.CT_QUERY || config.CT_QUERY)
+            .split(',').map(q => q.trim()).filter(Boolean),
+        seenJobIds: arg1 instanceof Set ? arg1 : new Set(),
+    };
+}
+
+async function scrapeLaborum(arg1, arg2, maxAgeDays = 1) {
+    const { queries, seenJobIds } = resolveArgs(arg1, arg2);
 
     const jobs = [];
     const seenInThisRun = new Set();
@@ -45,7 +59,7 @@ async function scrapeLaborum(seenJobIds = new Set()) {
             console.log(`[Scraper] '${query}': ${jobList.length} ofertas.`);
 
             for (const item of jobList) {
-                if (!esReciente(item.fechaHoraPublicacion)) continue;
+                if (!esReciente(item.fechaHoraPublicacion, maxAgeDays)) continue;
 
                 const jobId = `laborum_${item.id}`;
                 if (seenInThisRun.has(jobId)) continue;
@@ -66,6 +80,7 @@ async function scrapeLaborum(seenJobIds = new Set()) {
                     url: jobUrl,
                     source: SOURCE_NAME,
                     description,
+                    publishedAt: item.fechaHoraPublicacion ? new Date(item.fechaHoraPublicacion).getTime() : null,
                 });
             }
 

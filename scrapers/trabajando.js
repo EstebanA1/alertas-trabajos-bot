@@ -7,11 +7,11 @@ const { htmlToText } = require('../utils/html');
 const TRABAJANDO_API = 'https://www.trabajando.cl/api/searchjob';
 const SOURCE_NAME = 'Trabajando.cl';
 
-function esReciente(fechaStr) {
+function esReciente(fechaStr, maxAgeDays = 1) {
     if (!fechaStr) return true;
     const publicado = new Date(fechaStr);
-    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return publicado >= hace24h;
+    const limite = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+    return publicado >= limite;
 }
 
 function slugify(str) {
@@ -22,9 +22,23 @@ function slugify(str) {
         .replace(/^-|-$/g, '');
 }
 
-async function scrapeTrabajandog(seenJobIds = new Set()) {
-    const queries = (process.env.CT_QUERY || config.CT_QUERY)
-        .split(',').map(q => q.trim()).filter(Boolean);
+function resolveArgs(arg1, arg2) {
+    if (Array.isArray(arg1)) {
+        return {
+            queries: arg1.map(q => String(q).trim()).filter(Boolean),
+            seenJobIds: arg2 instanceof Set ? arg2 : new Set(),
+        };
+    }
+
+    return {
+        queries: (process.env.CT_QUERY || config.CT_QUERY)
+            .split(',').map(q => q.trim()).filter(Boolean),
+        seenJobIds: arg1 instanceof Set ? arg1 : new Set(),
+    };
+}
+
+async function scrapeTrabajandog(arg1, arg2, maxAgeDays = 1) {
+    const { queries, seenJobIds } = resolveArgs(arg1, arg2);
 
     const jobs = [];
     const seenInThisRun = new Set();
@@ -52,10 +66,8 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
             const jobList = response.data?.ofertas || [];
             console.log(`[Scraper] '${query}': ${jobList.length} ofertas.`);
 
-            const slugQuery = slugify(query);
-
             for (const item of jobList) {
-                if (!esReciente(item.fechaPublicacion)) continue;
+                if (!esReciente(item.fechaPublicacion, maxAgeDays)) continue;
 
                 const jobId = `trabajando_${item.idOferta}`;
                 if (seenInThisRun.has(jobId)) continue;
@@ -94,11 +106,8 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                     }
                 }
 
-                // Filtro de experiencia directo desde el campo de la API (más fiable que el regex en texto)
-                if (aniosExp !== null && aniosExp >= 3) {
-                    console.log(`[Scraper] Descartada por experiencia (${aniosExp} años): ${item.nombreCargo}`);
-                    continue;
-                }
+                // Filtro de experiencia eliminado: ahora el runner filtra por user.years_experience
+                // aniosExp se incluye en el job object para que el runner decida
 
                 jobs.push({
                     id: jobId,
@@ -107,6 +116,8 @@ async function scrapeTrabajandog(seenJobIds = new Set()) {
                     url: jobUrl,
                     source: SOURCE_NAME,
                     description,
+                    requiredYears: aniosExp,
+                    publishedAt: item.fechaPublicacion ? new Date(item.fechaPublicacion).getTime() : null,
                 });
             }
 

@@ -6,15 +6,31 @@ const { htmlToText } = require('../utils/html');
 const GOB_API = 'https://www.getonbrd.com/api/v0/search/jobs';
 const SOURCE_NAME = 'GetOnBoard';
 
-function esReciente(publishedAt) {
+function esReciente(publishedAt, maxAgeDays = 1) {
     if (!publishedAt) return true;
     const publicado = new Date(publishedAt * 1000);
-    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return publicado >= hace24h;
+    const limite = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+    return publicado >= limite;
 }
 
-async function scrapeGetOnBoard(seenJobIds = new Set()) {
-    const queries = ['desarrollador', 'developer', 'frontend', 'backend', 'fullstack'];
+function resolveArgs(arg1, arg2) {
+    const defaultQueries = ['desarrollador', 'developer', 'frontend', 'backend', 'fullstack'];
+    if (Array.isArray(arg1)) {
+        const normalized = arg1.map(q => String(q).trim()).filter(Boolean);
+        return {
+            queries: normalized.length ? normalized : defaultQueries,
+            seenJobIds: arg2 instanceof Set ? arg2 : new Set(),
+        };
+    }
+
+    return {
+        queries: defaultQueries,
+        seenJobIds: arg1 instanceof Set ? arg1 : new Set(),
+    };
+}
+
+async function scrapeGetOnBoard(arg1, arg2, maxAgeDays = 1) {
+    const { queries, seenJobIds } = resolveArgs(arg1, arg2);
 
     const jobs = [];
     const seenInThisRun = new Set();
@@ -44,7 +60,7 @@ async function scrapeGetOnBoard(seenJobIds = new Set()) {
             for (const item of jobList) {
                 const attrs = item.attributes || {};
 
-                if (!esReciente(attrs.published_at)) continue;
+                if (!esReciente(attrs.published_at, maxAgeDays)) continue;
 
                 const jobId = `gob_${item.id}`;
                 if (seenInThisRun.has(jobId)) continue;
@@ -69,6 +85,7 @@ async function scrapeGetOnBoard(seenJobIds = new Set()) {
                     url: jobUrl,
                     source: SOURCE_NAME,
                     description: partes,
+                    publishedAt: attrs.published_at ? attrs.published_at * 1000 : null,
                 });
             }
 
