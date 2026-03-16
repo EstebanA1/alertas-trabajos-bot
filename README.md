@@ -1,130 +1,91 @@
-# Alertas Trabajos Bot 🤖
+# AlertasTrabajos Bot 🤖 (V2)
 
-Bot de Telegram multiusuario para detectar anuncios laborales en portales y canales, filtrar por perfil técnico y avisar rápido para postular antes.
+Un bot de Telegram avanzado, **multiusuario e interactivo**, diseñado para rastrear portales de empleo y enviarte notificaciones push en tiempo real cuando se publican ofertas que encajan exactamente con tu perfil técnico.
 
-## Estado actual
+Esta versión V2 está diseñada para ejecutarse de forma persistente (24/7) en un servidor Linux o contenedor LXC (ej. Proxmox), utilizando Long-Polling y una base de datos SQLite local para manejar múltiples usuarios simultáneos, cada uno con sus propias configuraciones aisladas.
 
-- Modo principal: multiusuario con wizard en Telegram (`/start`) y configuración por usuario.
-- Persistencia: SQLite local (`db/database.sqlite`) para estado de usuarios y deduplicación por usuario.
-- Scheduler: cron interno cada 5 minutos (sin GitHub Actions), pensado para correr 24/7 en Debian LXC.
-- Compatibilidad: se mantienen scripts legacy (`test_scraper.js`) para pruebas rápidas de scraping single-user.
+---
 
-## Arquitectura
+## ✨ Características Principales
 
-```
-index.js (bot polling + cron cada 5 min)
-    ├── bot/handlers/            # Wizard de configuración por chat
-    ├── scraper/runner.js        # Orquestación central de scrapers
-    ├── scrapers/                # Extracción por portal/canal
-    ├── notifier/telegram.js     # Formateo y envío por usuario
-    └── db/database.js           # API de datos (SQLite)
-                 └── db/schema.js      # Esquema y utilidades SQL
-```
+- **🧍 Multiusuario:** Soporta cientos de usuarios en la misma instancia del bot. Cada usuario (basado en su `chat_id` de Telegram) posee filtros y reglas independientes.
+- **💬 Setup Conversacional:** No requiere tocar código ni archivos `.env` para configurarlo. Al enviarle `/start` al bot, un asistente (*wizard*) interactivo te pregunta mediante menús y mensajes qué quieres buscar.
+- **🎯 Filtrado de Alta Precisión:**
+  - **Portal Selection:** Elige encender o apagar portales individualmente (ej. GetOnBoard, Laborum).
+  - **Consultas Custom:** Busca cargos específicos (`Desarrollador, QA, Data Engineer, etc.`).
+  - **Whitelist:** Tecnologías o palabras clave que la oferta *debe* contener.
+  - **Blacklist (Soft / Hard):** Ignora automáticamente ofertas que contengan tecnologías que no manejas o roles que no te interesan.
+  - **Filtro de Experiencia Automático:** Descarta trabajos que superen tu nivel de seniority (detecta frases como "más de 3 años de experiencia").
+- **🔑 Bring Your Own Key (BYOK):** Para portales que requieren rotación agresiva de IPs (como Computrabajo), el bot puede solicitar una API Key particular de proxy (ScraperAPI) a nivel de usuario, protegiendo al servidor de exceder cuotas gratuitas.
+- **📉 Caché Local y Deduplicación:** Nunca te enviará la misma oferta dos veces gracias al registro en base de datos. Además optimiza las peticiones al mercado descargando el listado central y evaluándolo localmente contra cada usuario (Caché por 5 minutos).
 
-## Flujo multiusuario
+---
 
-1. Usuario inicia con `/start` y define portales/filtros.
-2. Bot guarda estado y configuración por `chat_id` en SQLite.
-3. Cada 5 min, `runner` obtiene usuarios activos.
-4. Descarga pools compartidos (Telegram, Laborum, GetOnBoard, Trabajando) y Computrabajo por usuario si tiene `scraperapi_key`.
-5. Aplica filtros personalizados (whitelist, blacklist hard/soft, experiencia).
-6. Evita duplicados por usuario con `seen_jobs` y envía alertas.
+## 🏗️ Arquitectura y Tecnologías
 
-### Comandos del bot
+El proyecto ha transicionado desde *GitHub Actions Stateless* a una arquitectura de Node.js Continua:
 
-- `/start`: inicia el wizard o, si ya existe configuración, muestra menú para editar o reiniciar.
-- `/config`: muestra el resumen actual de la configuración.
-- `/edit`: pausa alertas y abre edición granular de la configuración.
-- `/pause`: pausa temporalmente las alertas sin borrar la configuración.
-- `/resume`: reactiva las alertas guardadas.
+- **Entrypoint:** `index.js` (Mantiene conexión WebSockets de Telegram + Ejecuta un ciclo interno con `node-cron` cada 5 minutos).
+- **Base de Datos:** `SQLite3` (Almacenamiento persistente local y liviano, ideal para entornos Docker/LXC).
+- **Controladores (`bot/handlers`):** Gestores de la máquina de estados de Telegram (Start, Messages, Callbacks).
+- **Orquestador (`scraper/runner.js`):** Descarga el set global de empleos y efectúa el ruteo personalizado hacia el chat de cada usuario.
 
-### Wizard actual
+### Portales Soportados Naturalmente
+1. **Laborum Chile** (Vía API Interna).
+2. **GetOnBoard** (Vía API Pública).
+3. **Trabajando.cl** (Vía red inter-sitios).
+4. **DCCEmpleoSinFiltro** (Web Scraping ligero a canal público de Telegram).
+5. **Computrabajo Chile** *(Requiere ScraperAPI Key configurada por el usuario en el bot).*
 
-- Selección de portales con botones inline.
-- `Computrabajo` queda bloqueado hasta que el usuario entregue su `ScraperAPI key`.
-- Captura de queries, whitelist, blacklist soft y blacklist hard.
-- Resumen final con confirmación antes de dejar al usuario activo.
-- Si el usuario entra en modo edición, las alertas quedan pausadas hasta confirmar cambios.
+---
 
-## Portales soportados
+## 🚀 Guía de Despliegue (Proxmox LXC / VPS)
 
-| Portal | Método | Requisito |
-|---|---|---|
-| Computrabajo Chile | HTML scraping + proxy | ScraperAPI por usuario |
-| Laborum Chile | API interna REST | Ninguno |
-| GetOnBoard | API pública | Ninguno |
-| Trabajando.cl | API interna + detalle | Ninguno |
-| DCCEmpleoSinFiltro | Web Telegram (`t.me/s/`) | Ninguno |
+Para alojar el bot y ponerlo en funcionamiento 24/7:
 
-## Variables de entorno
+1. **Clonar Repositorio:**
+   ```bash
+   git clone https://github.com/EstebanA1/alertas-trabajos-bot.git
+   cd alertas-trabajos-bot
+   ```
 
-Copia `.env.example` a `.env`.
+2. **Instalar Dependencias de Node:**
+   Requiere versión de Node `>= 18`.
+   ```bash
+   npm install
+   ```
 
-| Variable | Uso |
-|---|---|
-| `TELEGRAM_TOKEN` | Obligatoria. Token del bot |
-| `BOT_TIMEZONE` | Opcional. Ej: `America/Santiago` |
-| `SCRAPERAPI_KEY` | Opcional. Fallback global legacy |
-| `CT_QUERY` | Opcional. Queries por defecto legacy |
-| `TELEGRAM_CHAT_ID` | Solo modo legacy (`test_scraper.js`) |
+3. **Configurar Variable de Entorno:**
+   Crea y edita el archivo secreto en la raíz:
+   ```bash
+   nano .env
+   ```
+   *Solo necesitas definir el Token que BotFather te dio en Telegram:*
+   ```env
+   TELEGRAM_TOKEN=123456789:ABCDE...tus_secretos...
+   ```
 
-Notas:
-- En modo multiusuario, cada usuario puede guardar su propia `scraperapi_key` en el wizard.
-- En modo legacy, `TELEGRAM_CHAT_ID` sigue siendo requerido para envío a un chat fijo.
+4. **Ejecución y Persistencia usando PM2:**
+   Para asegurar que el Bot reviva ante reinicios de máquina y corra en background, se recomienda globalmente `pm2`.
+   ```bash
+   sudo npm install -g pm2
+   pm2 start index.js --name "alertas-bot"
+   pm2 save
+   pm2 startup
+   ```
 
-## Ejecutar local
+*(Una vez iniciado, el archivo `database.sqlite` se creará mágicamente en la carpeta `db/`).*
 
-```bash
-npm install
+---
 
-# Modo principal (multiusuario)
-npm start
+## 🕹️ Uso Diario
 
-# Modo legacy (single-user, útil para diagnóstico rápido)
-npm run start:legacy
-```
+Abre Telegram, busca a tu bot e interacciona:
+- `/start` — Inicia el Wizard de configuración paso a paso.
+- `/config` — Visualiza tus portales, reglas y palabras clave actuales.
 
-## Despliegue en Debian LXC (Proxmox)
+---
 
-Se recomienda PM2 para mantener el proceso vivo y reiniciar en reboot.
+## ⚙️ Modo Heredado (Legacy V1)
 
-```bash
-# dentro del LXC
-npm install
-npm install -g pm2
-
-mkdir -p logs
-pm2 start ecosystem.config.js --env production
-pm2 save
-pm2 startup systemd
-```
-
-Comandos útiles:
-
-```bash
-pm2 status
-pm2 logs alertastrabajos-bot
-pm2 restart alertastrabajos-bot
-pm2 stop alertastrabajos-bot
-```
-
-## Robustez aplicada
-
-- `node-cron` con `noOverlap: true` y zona horaria configurable.
-- Control de ejecución concurrente en `runner` para evitar ciclos duplicados.
-- `SQLite WAL + busy_timeout` para menor contención en escrituras.
-- Manejo de señales `SIGINT/SIGTERM` para cierre limpio de polling.
-- API de scrapers con firma compatible para modo legacy y multiusuario.
-
-## Estructura relevante
-
-```
-index.js
-scraper/runner.js
-db/database.js
-db/schema.js
-notifier/telegram.js
-scrapers/*.js
-ecosystem.config.js
-.env.example
-```
+*Si llegaste a este repositorio buscando la versión original (Stateless V1) que funcionaba mediante flujos automáticos gratuitos directamente hospedada en **GitHub Actions** y **Upstash Redis** (sin necesitar un VPS propio), por favor refiérete a la rama `v1-github-actions`.*
