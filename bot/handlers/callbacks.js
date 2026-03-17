@@ -108,7 +108,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
             await commitUserConfigDraft(chatId, { active: true });
             const config = await getUserConfig(chatId);
             await bot.answerCallbackQuery(callbackQuery.id, { text: 'Configuración activada.' });
-            return bot.sendMessage(chatId, `🎉 *¡Configuración guardada!*\n\nTu bot ya quedó activo. A partir de ahora te enviaré alertas según este perfil:\n\n${formatUserConfig(config, { active: true })}\n\nPuedes revisar o cambiar cualquier cosa con /config o /edit.`, {
+            return bot.sendMessage(chatId, `🎉 *¡Configuración guardada!*\n\nTu bot ya quedó activo. A partir de ahora te enviaré alertas según este perfil:\n\n${formatUserConfig(config, { active: true })}\n\nPuedes revisar o cambiar cualquier cosa con /status o /edit.`, {
                 parse_mode: 'Markdown',
             });
         } catch (err) {
@@ -123,7 +123,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
         await discardUserConfigDraft(chatId);
         await updateUserState(chatId, 'IDLE');
         await bot.answerCallbackQuery(callbackQuery.id);
-        return bot.sendMessage(chatId, 'Borrador descartado. Tu configuración activa no cambió. Usa /start para comenzar de nuevo o /config para revisar tu configuración.', {
+        return bot.sendMessage(chatId, 'Borrador descartado. Tu configuración activa no cambió. Usa /start para comenzar de nuevo o /status para revisar tu configuración.', {
             parse_mode: 'Markdown',
         });
     }

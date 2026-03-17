@@ -82,7 +82,34 @@ bot.onText(/^\/resume$/, async (msg) => {
     });
 });
 
-bot.onText(/^\/config$/, async (msg) => {
+bot.onText(/^\/help$/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    const helpText =
+        `🤖 *¿Qué puedo hacer por ti?*
+
+Soy un bot que revisa portales de empleo cada 5 minutos y te avisa cuando aparece una oferta que calza con tu perfil. Sin que tengas que estar mirando la pantalla.
+
+📋 *Comandos disponibles:*
+
+▶️ /start — Inicia (o reinicia) la configuración de tus alertas. Úsalo la primera vez para decirme qué trabajo buscas.
+
+⚙️ /status — Muestra cómo tienes configuradas tus alertas en este momento.
+
+✏️ /edit — Abre el menú de edición para cambiar cualquier dato de tu configuración (qué buscar, en qué portales, etc.)
+
+⏸️ /pause — Pausa las notificaciones. Tu configuración se guarda, solo dejas de recibir alertas temporalmente.
+
+▶️ /resume — Reactiva las notificaciones después de haberlas pausado.
+
+ℹ️ /help — Muestra este mensaje de ayuda.
+
+💬 *¿Cómo funciona el setup?*
+Cuando usas /start, el bot te hace una serie de preguntas sobre qué tipo de trabajo buscas, en qué portales y qué palabras clave quieres incluir o excluir. Todo paso a paso, sin necesidad de saber de tecnología.`;
+
+    return bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
+});
+
+bot.onText(/^\/status$/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const [user, config, draft] = await Promise.all([getUser(chatId), getUserConfig(chatId), getUserDraftConfig(chatId)]);
     
