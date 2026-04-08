@@ -141,12 +141,14 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
     if (data === 'cv_skip_suggestions') {
         await bot.answerCallbackQuery(callbackQuery.id);
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
 
     if (data === 'cv_suggest_improvements') {
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
         await bot.sendMessage(chatId, '⏳ Analizando tu perfil para sugerir mejoras...', { parse_mode: 'Markdown' });
 
         const draft = await getUserDraftConfig(chatId);
@@ -198,6 +200,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
@@ -205,6 +208,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
     if (data === 'cv_reject_suggestions') {
         await clearPendingSuggestion(chatId);
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Se mantiene tu versión original.' });
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
