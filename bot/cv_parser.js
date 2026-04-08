@@ -90,4 +90,47 @@ async function parseCvFromTelegram(bot, fileId, fileSize) {
     return extractCvDataWithGemini(text);
 }
 
-module.exports = { parseCvFromTelegram };
+/**
+ * Usa Gemini para sugerir expansiones/mejoras a la config actual del usuario.
+ * @param {{ queries: string[], whitelist: string[], years_experience: number|null }} currentConfig
+ * @returns {Promise<{ queries: string[], whitelist: string[] }>}
+ */
+async function generateRecommendations(currentConfig) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY no configurada.');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `Eres un experto en búsqueda de empleo en Chile (Computrabajo, Laborum, GetOnBoard).
+
+El usuario tiene esta configuración de búsqueda:
+- Cargos buscados: ${(currentConfig.queries || []).join(', ') || 'ninguno'}
+- Palabras clave (habilidades): ${(currentConfig.whitelist || []).join(', ') || 'ninguna'}
+- Años de experiencia: ${currentConfig.years_experience ?? 'no especificado'}
+
+Sugiere mejoras para ampliar el alcance SIN cambiar el perfil:
+1. Agrega sinónimos o variantes de los cargos (ej: "contador" → agrega "contador general", "analista contable")
+2. Agrega palabras clave relevantes que probablemente faltan (herramientas, certificaciones, áreas relacionadas)
+3. Máximo 6 cargos en total y 10 palabras clave en total
+4. Usa minúsculas y sin tildes
+5. NO repitas lo que ya tiene
+
+Responde SOLO con JSON válido con estas claves:
+- "queries": lista completa (originales + sugeridos)
+- "whitelist": lista completa (originales + sugeridos)
+
+Sin texto adicional ni bloques markdown.`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+    const cleaned = responseText.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+        queries:   Array.isArray(parsed.queries)   ? parsed.queries.slice(0, 6)   : (currentConfig.queries || []),
+        whitelist: Array.isArray(parsed.whitelist)  ? parsed.whitelist.slice(0, 10) : (currentConfig.whitelist || []),
+    };
+}
+
+module.exports = { parseCvFromTelegram, generateRecommendations };

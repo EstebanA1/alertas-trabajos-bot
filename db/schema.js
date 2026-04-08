@@ -60,6 +60,7 @@ function initDB() {
                 `ALTER TABLE user_config ADD COLUMN years_experience INTEGER DEFAULT NULL`,
                 `ALTER TABLE user_config_draft ADD COLUMN days_lookback INTEGER NOT NULL DEFAULT 1`,
                 `ALTER TABLE user_config_draft ADD COLUMN years_experience INTEGER DEFAULT NULL`,
+                `ALTER TABLE user_config_draft ADD COLUMN pending_suggestion TEXT DEFAULT NULL`,
             ];
             for (const sql of migrations) {
                 db.run(sql, (err) => {

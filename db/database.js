@@ -431,6 +431,33 @@ async function getSeenJobsSet() {
     return new Set(rows.map((r) => r.job_id));
 }
 
+async function savePendingSuggestion(chatId, suggestion) {
+    const db = await getDB();
+    await runAsync(
+        db,
+        'UPDATE user_config_draft SET pending_suggestion = ?, updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?',
+        [JSON.stringify(suggestion), chatId]
+    );
+    return true;
+}
+
+async function getPendingSuggestion(chatId) {
+    const db = await getDB();
+    const rows = await queryAsync(db, 'SELECT pending_suggestion FROM user_config_draft WHERE chat_id = ?', [chatId]);
+    if (!rows || !rows[0] || !rows[0].pending_suggestion) return null;
+    try { return JSON.parse(rows[0].pending_suggestion); } catch { return null; }
+}
+
+async function clearPendingSuggestion(chatId) {
+    const db = await getDB();
+    await runAsync(
+        db,
+        'UPDATE user_config_draft SET pending_suggestion = NULL WHERE chat_id = ?',
+        [chatId]
+    );
+    return true;
+}
+
 module.exports = {
     getDB,
     createUser,
@@ -451,6 +478,9 @@ module.exports = {
     addSeenJobForUser,
     cleanOldSeenJobs,
     clearUserData,
+    savePendingSuggestion,
+    getPendingSuggestion,
+    clearPendingSuggestion,
     isJobSeen,
     addJob,
     getSeenJobsSet,

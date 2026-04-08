@@ -212,13 +212,17 @@ async function handleDocumentMessage(bot, msg) {
         `*Palabras clave:* ${whitelistStr}\n` +
         `*Años de experiencia:* ${expStr}\n\n` +
         `_Podrás revisar y editar todo esto al final antes de confirmar._`,
-        { parse_mode: 'Markdown' }
+        {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '💡 Ver recomendaciones de mejora', callback_data: 'cv_suggest_improvements' }],
+                    [{ text: '▶️ Continuar sin optimizar', callback_data: 'cv_skip_suggestions' }],
+                ]
+            }
+        }
     );
-
-    // Avanzar al paso de selección de portales
-    await updateUserState(chatId, 'AWAITING_PORTALS');
-    const { sendPortalSelection } = require('./start');
-    return sendPortalSelection(bot, chatId, []);
+    // El avance a portales ocurre desde el callback (cv_skip_suggestions o después de aplicar/rechazar sugerencias)
 }
 
 module.exports = { handleMessage, handleDocumentMessage, promptField, sendSummary };

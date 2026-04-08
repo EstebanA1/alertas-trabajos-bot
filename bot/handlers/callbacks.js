@@ -7,6 +7,9 @@ const {
     getUserConfig,
     getUserDraftConfig,
     resetUserConfiguration,
+    savePendingSuggestion,
+    getPendingSuggestion,
+    clearPendingSuggestion,
     startUserConfigDraft,
     updateDraftFieldOnly,
     updateUserState,
@@ -15,6 +18,7 @@ const { buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig } = require
 const { promptField, sendSummary } = require('./messages');
 const { sendPortalSelection } = require('./start');
 const { getPromptForField } = require('../wizard');
+const { generateRecommendations } = require('../cv_parser');
 
 async function showSummary(bot, chatId) {
     const [user, draft, config] = await Promise.all([
@@ -132,6 +136,78 @@ async function handleCallbackQuery(bot, callbackQuery) {
         await bot.answerCallbackQuery(callbackQuery.id);
         const prompt = getPromptForField('cv_upload');
         return bot.sendMessage(chatId, prompt, { parse_mode: 'Markdown' });
+    }
+
+    // — Flujo de sugerencias IA post-CV —
+
+    if (data === 'cv_skip_suggestions') {
+        await bot.answerCallbackQuery(callbackQuery.id);
+        await updateUserState(chatId, 'AWAITING_PORTALS');
+        return sendPortalSelection(bot, chatId, []);
+    }
+
+    if (data === 'cv_suggest_improvements') {
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
+        await bot.sendMessage(chatId, '⏳ Analizando tu perfil para sugerir mejoras...', { parse_mode: 'Markdown' });
+
+        const draft = await getUserDraftConfig(chatId);
+        let suggestions = null;
+        try {
+            suggestions = await generateRecommendations(draft);
+            await savePendingSuggestion(chatId, suggestions);
+        } catch (err) {
+            console.error(`[Recomendaciones] Error para ${chatId}:`, err.message);
+            return bot.sendMessage(
+                chatId,
+                '⚠️ No pude generar sugerencias en este momento. Puedes continuar con tu configuración actual.',
+                { reply_markup: { inline_keyboard: [[{ text: '▶️ Continuar', callback_data: 'cv_skip_suggestions' }]] } }
+            );
+        }
+
+        const origQ = (draft.queries  || []).join(', ') || 'ninguno';
+        const origW = (draft.whitelist || []).join(', ') || 'ninguna';
+        const sugQ  = suggestions.queries.join(', ')   || 'ninguno';
+        const sugW  = suggestions.whitelist.join(', ') || 'ninguna';
+
+        return bot.sendMessage(
+            chatId,
+            `💡 *Sugerencias de mejora:*\n\n` +
+            `*Cargos buscados*\n` +
+            `  Actual: \`${origQ}\`\n` +
+            `  Sugerido: \`${sugQ}\`\n\n` +
+            `*Palabras clave*\n` +
+            `  Actual: \`${origW}\`\n` +
+            `  Sugerido: \`${sugW}\`\n\n` +
+            `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '✅ Aplicar sugerencias', callback_data: 'cv_apply_suggestions' }],
+                        [{ text: '↩️ Mantener mi versión', callback_data: 'cv_reject_suggestions' }],
+                    ]
+                }
+            }
+        );
+    }
+
+    if (data === 'cv_apply_suggestions') {
+        const suggestions = await getPendingSuggestion(chatId);
+        if (suggestions) {
+            if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            await clearPendingSuggestion(chatId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
+        await updateUserState(chatId, 'AWAITING_PORTALS');
+        return sendPortalSelection(bot, chatId, []);
+    }
+
+    if (data === 'cv_reject_suggestions') {
+        await clearPendingSuggestion(chatId);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Se mantiene tu versión original.' });
+        await updateUserState(chatId, 'AWAITING_PORTALS');
+        return sendPortalSelection(bot, chatId, []);
     }
 
     if (data === 'start_edit') {
