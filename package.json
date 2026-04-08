@@ -13,12 +13,14 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@upstash/redis": "^1.36.3",
     "axios": "^1.13.6",
     "cheerio": "^1.2.0",
     "dotenv": "^17.3.1",
     "node-cron": "^4.2.1",
     "node-telegram-bot-api": "^0.67.0",
+    "pdf-parse": "^2.4.5",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
   }

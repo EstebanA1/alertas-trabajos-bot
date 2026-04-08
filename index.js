@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const { activateUser, getDB, getUser, getUserConfig, getUserDraftConfig, startUserConfigDraft, updateUserState } = require('./db/database');
 const { handleStart } = require('./bot/handlers/start');
-const { handleMessage } = require('./bot/handlers/messages');
+const { handleMessage, handleDocumentMessage } = require('./bot/handlers/messages');
 const { handleCallbackQuery } = require('./bot/handlers/callbacks');
 const { buildEditMenuKeyboard, formatUserConfig } = require('./bot/wizard');
 
@@ -126,6 +126,9 @@ bot.onText(/^\/status$/, async (msg) => {
 
 // Respuestas al Wizard
 bot.on('message', (msg) => handleMessage(bot, msg));
+
+// Documentos (CV en PDF para setup rápido)
+bot.on('document', (msg) => handleDocumentMessage(bot, msg));
 
 // Botones Inline (Portales)
 bot.on('callback_query', (query) => handleCallbackQuery(bot, query));

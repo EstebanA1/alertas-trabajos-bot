@@ -13,6 +13,7 @@ const {
 const { buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig } = require('../wizard');
 const { promptField, sendSummary } = require('./messages');
 const { sendPortalSelection } = require('./start');
+const { getPromptForField } = require('../wizard');
 
 async function showSummary(bot, chatId) {
     const [user, draft, config] = await Promise.all([
@@ -78,9 +79,27 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
     if (data === 'start_reset') {
         await resetUserConfiguration(chatId);
-        await updateUserState(chatId, 'AWAITING_PORTALS');
+        await startUserConfigDraft(chatId);
+        await updateUserState(chatId, 'AWAITING_CV_CHOICE');
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Configuración reiniciada.' });
+        return bot.sendMessage(
+            chatId,
+            `🚀 *Reiniciando configuración.*\n\n¿Cómo prefieres volver a configurar tus alertas?`,
+            { parse_mode: 'Markdown', reply_markup: require('../wizard').buildCvChoiceKeyboard() }
+        );
+    }
+
+    if (data === 'cv_choice_manual') {
+        await updateUserState(chatId, 'AWAITING_PORTALS');
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Configuración manual.' });
         return sendPortalSelection(bot, chatId, []);
+    }
+
+    if (data === 'cv_choice_upload') {
+        await updateUserState(chatId, 'AWAITING_CV_UPLOAD');
+        await bot.answerCallbackQuery(callbackQuery.id);
+        const prompt = getPromptForField('cv_upload');
+        return bot.sendMessage(chatId, prompt, { parse_mode: 'Markdown' });
     }
 
     if (data === 'start_edit') {

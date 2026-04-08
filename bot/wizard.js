@@ -50,6 +50,14 @@ function buildPortalKeyboard(selectedPortals = []) {
     return { inline_keyboard: keyboard };
 }
 
+function buildCvChoiceKeyboard() {
+    return {
+        inline_keyboard: [
+            [{ text: '📄 Subir mi CV (PDF)', callback_data: 'cv_choice_upload' }],
+            [{ text: '✍️ Configurar manualmente', callback_data: 'cv_choice_manual' }],
+        ],
+    };
+}
 function buildStartMenuKeyboard() {
     return {
         inline_keyboard: [
@@ -147,6 +155,8 @@ Para poder buscar en Computrabajo, el bot necesita una clave personal gratuita. 
 *4.* Vuelve aquí y pega la clave directamente en este chat (sin texto adicional).
 
 El plan gratuito es suficiente para uso personal. ✅`;
+        case 'cv_upload':
+            return `📄 *Envíame tu CV en formato PDF*\n\n_El archivo debe estar en español y no estar escaneado (imagen). Tamaño máximo: 5 MB._\n\nAnalizaré tu CV y pre-completaré automáticamente los campos de búsqueda.`;
         default:
             return '';
     }
@@ -154,6 +164,7 @@ El plan gratuito es suficiente para uso personal. ✅`;
 
 module.exports = {
     PORTAL_DEFINITIONS,
+    buildCvChoiceKeyboard,
     buildPortalKeyboard,
     buildStartMenuKeyboard,
     buildSummaryKeyboard,

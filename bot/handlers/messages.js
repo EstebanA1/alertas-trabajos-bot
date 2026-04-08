@@ -1,4 +1,5 @@
 const { getUser, getUserDraftConfig, updateDraftFieldOnly, updateUserState } = require('../../db/database');
+const { parseCvFromTelegram } = require('../cv_parser');
 const { buildSummaryKeyboard, formatUserConfig, getPromptForField, isNoneKeyword, normalizeCsvInput } = require('../wizard');
 
 function promptFieldIdFromState(state) {
@@ -144,15 +145,80 @@ async function handleMessage(bot, msg) {
 
     if (user.state === 'AWAITING_BLACKLIST_SOFT') {
         await updateUserState(chatId, 'AWAITING_BLACKLIST_HARD');
-        return bot.sendMessage(chatId, '✅ *Blacklist soft guardada.*', { parse_mode: 'Markdown' })
+        return bot.sendMessage(chatId, '✅ *Palabras a evitar guardadas.*', { parse_mode: 'Markdown' })
             .then(() => promptField(bot, chatId, 'blacklist_hard'));
     }
 
     if (user.state === 'AWAITING_BLACKLIST_HARD') {
         const updatedConfig = await getUserDraftConfig(chatId);
-        return bot.sendMessage(chatId, '✅ *Blacklist hard guardada.*', { parse_mode: 'Markdown' })
+        return bot.sendMessage(chatId, '✅ *Palabras bloqueantes guardadas.*', { parse_mode: 'Markdown' })
             .then(() => sendSummary(bot, chatId, updatedConfig, user));
     }
 }
 
-module.exports = { handleMessage, promptField, sendSummary };
+async function handleDocumentMessage(bot, msg) {
+    const chatId = msg.chat.id.toString();
+    const user = await getUser(chatId);
+
+    // Solo actuar cuando el usuario está esperando subir su CV
+    if (!user || user.state !== 'AWAITING_CV_UPLOAD') return;
+
+    const doc = msg.document;
+
+    // Validar que sea PDF
+    if (doc.mime_type !== 'application/pdf') {
+        return bot.sendMessage(
+            chatId,
+            '⚠️ El archivo debe ser un PDF. Por favor envía tu CV en formato `.pdf`.',
+            { parse_mode: 'Markdown' }
+        );
+    }
+
+    await bot.sendMessage(chatId, '⏳ Analizando tu CV, un momento...', { parse_mode: 'Markdown' });
+
+    let cvData = null;
+    try {
+        cvData = await parseCvFromTelegram(bot, doc.file_id, doc.file_size);
+    } catch (err) {
+        console.error(`[CV Parser] Error para ${chatId}: ${err.message}`);
+        return bot.sendMessage(
+            chatId,
+            `⚠️ *No pude procesar tu CV.*\n\n_${err.message}_\n\nPuedes continuar configurando los datos manualmente.`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '✍️ Continuar manualmente', callback_data: 'cv_choice_manual' }
+                    ]]
+                }
+            }
+        );
+    }
+
+    // Guardar los campos extraídos en el draft
+    if (cvData.queries?.length)          await updateDraftFieldOnly(chatId, 'queries', cvData.queries);
+    if (cvData.whitelist?.length)        await updateDraftFieldOnly(chatId, 'whitelist', cvData.whitelist);
+    if (cvData.years_experience != null) await updateDraftFieldOnly(chatId, 'years_experience', cvData.years_experience);
+
+    // Mostrar resumen de lo detectado
+    const queriesStr   = cvData.queries?.length   ? cvData.queries.join(', ')   : 'No detectados';
+    const whitelistStr = cvData.whitelist?.length  ? cvData.whitelist.join(', ') : 'No detectadas';
+    const expStr       = cvData.years_experience != null ? `${cvData.years_experience} año(s)` : 'No detectados';
+
+    await bot.sendMessage(
+        chatId,
+        `✅ *¡CV analizado!* Esto es lo que detecté:\n\n` +
+        `*Cargos buscados:* ${queriesStr}\n` +
+        `*Palabras clave:* ${whitelistStr}\n` +
+        `*Años de experiencia:* ${expStr}\n\n` +
+        `_Podrás revisar y editar todo esto al final antes de confirmar._`,
+        { parse_mode: 'Markdown' }
+    );
+
+    // Avanzar al paso de selección de portales
+    await updateUserState(chatId, 'AWAITING_PORTALS');
+    const { sendPortalSelection } = require('./start');
+    return sendPortalSelection(bot, chatId, []);
+}
+
+module.exports = { handleMessage, handleDocumentMessage, promptField, sendSummary };

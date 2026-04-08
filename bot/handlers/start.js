@@ -1,5 +1,5 @@
 const { createUser, getUser, getUserConfig, resetUserConfiguration, startUserConfigDraft, updateUserState } = require('../../db/database');
-const { buildPortalKeyboard, buildStartMenuKeyboard, hasConfiguredData, formatUserConfig } = require('../wizard');
+const { buildPortalKeyboard, buildStartMenuKeyboard, buildCvChoiceKeyboard, hasConfiguredData, formatUserConfig } = require('../wizard');
 
 async function sendPortalSelection(bot, chatId, selectedPortals = []) {
     const welcomeText = `🚀 *¡Hola! Misión: encontrarte trabajo.*
@@ -35,8 +35,23 @@ async function handleStart(bot, msg) {
 
     await resetUserConfiguration(chatId);
     await startUserConfigDraft(chatId);
-    await updateUserState(chatId, 'AWAITING_PORTALS');
-    return sendPortalSelection(bot, chatId, []);
+    await updateUserState(chatId, 'AWAITING_CV_CHOICE');
+
+    return bot.sendMessage(
+        chatId,
+        `🚀 *¡Hola! Vamos a configurar tus alertas de empleo.*
+
+Te haré unas preguntas para saber qué trabajo buscas. Puedes hacerlo de dos formas:
+
+📄 *Subiendo tu CV* — Lo analizo automáticamente y pre-completo la mayor parte.
+✍️ *Manualmente* — Te hago las preguntas una a una.
+
+_¿Cómo prefieres configurarlo?_`,
+        {
+            parse_mode: 'Markdown',
+            reply_markup: buildCvChoiceKeyboard(),
+        }
+    );
 }
 
 module.exports = { handleStart, sendPortalSelection };
