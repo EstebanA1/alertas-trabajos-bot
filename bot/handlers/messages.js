@@ -84,6 +84,14 @@ async function handleMessage(bot, msg) {
     const user = await getUser(chatId);
     if (!user) return;
 
+    // Estados donde se espera una acción distinta a texto libre
+    if (user.state === 'AWAITING_CV_CHOICE') {
+        return bot.sendMessage(chatId, '👆 Por favor elige una opción de los botones de arriba para continuar.', { parse_mode: 'Markdown' });
+    }
+    if (user.state === 'AWAITING_CV_UPLOAD') {
+        return bot.sendMessage(chatId, '📎 Por favor envía tu CV como archivo PDF (no como texto).', { parse_mode: 'Markdown' });
+    }
+
     const fieldId = promptFieldIdFromState(user.state);
     if (!fieldId) return;
 

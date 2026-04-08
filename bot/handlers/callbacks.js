@@ -14,10 +14,9 @@ const {
     updateDraftFieldOnly,
     updateUserState,
 } = require('../../db/database');
-const { buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig } = require('../wizard');
+const { buildCvChoiceKeyboard, buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig, getPromptForField } = require('../wizard');
 const { promptField, sendSummary } = require('./messages');
 const { sendPortalSelection } = require('./start');
-const { getPromptForField } = require('../wizard');
 const { generateRecommendations } = require('../cv_parser');
 
 async function showSummary(bot, chatId) {
@@ -121,7 +120,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
         return bot.sendMessage(
             chatId,
             `🚀 *Reiniciando configuración.*\n\n¿Cómo prefieres volver a configurar tus alertas?`,
-            { parse_mode: 'Markdown', reply_markup: require('../wizard').buildCvChoiceKeyboard() }
+            { parse_mode: 'Markdown', reply_markup: buildCvChoiceKeyboard() }
         );
     }
 
