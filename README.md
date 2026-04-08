@@ -87,7 +87,16 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
    pm2 startup
    ```
 
+5. **Rotación de Logs (Recomendado):**
+   Para evitar que los archivos log crezcan infinitamente, instala:
+   ```bash
+   pm2 install pm2-logrotate
+   ```
+
 El archivo `db/database.sqlite` se crea automáticamente al iniciar.
+
+> 💡 **Tip para Producción Avanzada:**
+> Por defecto el bot funciona con *Long-polling*. Si dispones de un servidor web con dominio (ej. nginx) y certificado SSL, considera transicionar tu propio código a modo **Webhook** para hacerlo más eficiente en recursos.
 
 ---
 
