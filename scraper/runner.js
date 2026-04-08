@@ -11,8 +11,8 @@ const SOFT_TOLERANCE = 2;
 function matchPalabra(texto, palabra) {
     const escaped = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = /\w$/.test(palabra)
-        ? new RegExp(`\\b${escaped}\\b`)
-        : new RegExp(escaped);
+        ? new RegExp(`(?<![a-záéíóúüñA-ZÁÉÍÓÚÜÑ0-9])${escaped}(?![a-záéíóúüñA-ZÁÉÍÓÚÜÑ0-9])`, 'i')
+        : new RegExp(escaped, 'i');
     return regex.test(texto);
 }
 
@@ -42,7 +42,7 @@ function tieneExpExcesiva(texto, threshold) {
 }
 
 function pasaFiltros(job, config, isTelegram = false) {
-    const texto = `${job.title} ${job.description}`.toLowerCase();
+    const texto = `${job.title ?? ''} ${job.description ?? ''}`.toLowerCase();
 
     // 1. Experiencia numérica directa (Trabajando.cl) — más fiable que el regex
     if (job.requiredYears != null && config.years_experience != null) {
@@ -85,7 +85,7 @@ function buildSharedQueries(usersConfig) {
 
 function matchesQueries(job, queries = []) {
     if (!Array.isArray(queries) || queries.length === 0) return false;
-    const texto = `${job.title} ${job.description}`.toLowerCase();
+    const texto = `${job.title ?? ''} ${job.description ?? ''}`.toLowerCase();
     return queries.some((query) => {
         const normalized = String(query || '').trim().toLowerCase();
         if (!normalized) return false;
