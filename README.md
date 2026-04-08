@@ -72,7 +72,7 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
    # Para análisis de CV con IA (obtener en https://aistudio.google.com/apikey)
    GEMINI_API_KEY=tu_api_key
 
-   # ID de Telegram del admin para habilitar comando /admin
+   # ID de Telegram del admin para habilitar comando /admin (obtener con @userinfobot)
    ADMIN_CHAT_ID=tu_chat_id
 
    # Timezone del cron (default: America/Santiago)
