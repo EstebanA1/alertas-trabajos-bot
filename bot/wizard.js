@@ -64,6 +64,7 @@ function buildStartMenuKeyboard() {
             [{ text: '✏️ Editar configuración', callback_data: 'start_edit' }],
             [{ text: '🔄 Reiniciar desde cero', callback_data: 'start_reset' }],
             [{ text: '📋 Ver resumen actual', callback_data: 'wizard_summary' }],
+            [{ text: '🗑️ Limpiar mis datos', callback_data: 'start_clean' }],
         ],
     };
 }

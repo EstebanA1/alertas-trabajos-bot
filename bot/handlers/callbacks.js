@@ -1,5 +1,6 @@
 const {
     activateUser,
+    clearUserData,
     commitUserConfigDraft,
     discardUserConfigDraft,
     getUser,
@@ -76,6 +77,37 @@ async function handleCallbackQuery(bot, callbackQuery) {
     const message = callbackQuery.message;
     const chatId = message.chat.id.toString();
     const data = callbackQuery.data;
+
+    if (data === 'start_clean') {
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return bot.sendMessage(
+            chatId,
+            '🗑️ *¿Seguro que quieres limpiar todos tus datos?*\n\n_Esto borrará tu configuración actual y tu historial de ofertas vistas. Tendrás que configurar el bot de nuevo desde cero._',
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '⚠️ Sí, limpiar todo', callback_data: 'start_clean_confirm' }],
+                        [{ text: '❌ Cancelar', callback_data: 'wizard_summary' }],
+                    ]
+                }
+            }
+        );
+    }
+
+    if (data === 'start_clean_confirm') {
+        await clearUserData(chatId);
+        await startUserConfigDraft(chatId);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Datos eliminados.' });
+        return bot.sendMessage(
+            chatId,
+            '✅ *Todos tus datos fueron eliminados.*\n\nEl historial de ofertas vistas y tu configuración quedaron en blanco. Puedes volver a configurar desde cero cuando quieras.',
+            {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: [[{ text: '🚀 Configurar desde cero', callback_data: 'start_reset' }]] }
+            }
+        );
+    }
 
     if (data === 'start_reset') {
         await resetUserConfiguration(chatId);

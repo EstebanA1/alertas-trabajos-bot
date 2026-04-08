@@ -385,6 +385,33 @@ async function cleanOldSeenJobs(days = 14) {
     return true;
 }
 
+/**
+ * Limpia TODOS los datos del usuario: config, draft y historial de ofertas vistas.
+ * Deja al usuario en estado nuevo para poder re-configurar desde cero.
+ */
+async function clearUserData(chatId) {
+    const db = await getDB();
+    // Resetear configuración (igual que resetUserConfiguration)
+    await runAsync(
+        db,
+        `UPDATE user_config
+        SET portals = '[]', queries = '[]', whitelist = '[]',
+            blacklist_soft = '[]', blacklist_hard = '[]',
+            scraperapi_key = NULL, days_lookback = 1, years_experience = NULL
+        WHERE chat_id = ?`,
+        [chatId]
+    );
+    await runAsync(
+        db,
+        'UPDATE users SET active = 0, state = ?, updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?',
+        ['IDLE', chatId]
+    );
+    await runAsync(db, 'DELETE FROM user_config_draft WHERE chat_id = ?', [chatId]);
+    // Borrar historial de ofertas vistas del usuario
+    await runAsync(db, 'DELETE FROM seen_jobs WHERE chat_id = ?', [chatId]);
+    return true;
+}
+
 // Compatibilidad con scripts legacy (single-user)
 async function isJobSeen(jobId) {
     const db = await getDB();
@@ -423,6 +450,7 @@ module.exports = {
     isJobSeenByUser,
     addSeenJobForUser,
     cleanOldSeenJobs,
+    clearUserData,
     isJobSeen,
     addJob,
     getSeenJobsSet,
