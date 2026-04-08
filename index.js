@@ -124,6 +124,26 @@ bot.onText(/^\/status$/, async (msg) => {
     });
 });
 
+bot.onText(/^\/admin$/, async (msg) => {
+    const adminId = process.env.ADMIN_CHAT_ID;
+    const chatId = msg.chat.id.toString();
+    if (!adminId || chatId !== adminId) return;
+
+    const { getRunStats } = require('./scraper/runner');
+    const stats = getRunStats();
+
+    const text = `🛠️ *Panel de Administración*
+
+*Estado:* ${stats.lastRunStatus === 'running' ? '🚀 Escaneando...' : '💤 En espera'}
+*Último ciclo:* ${stats.lastRun ? stats.lastRun.toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'No ha corrido'}
+*Duración:* ${(stats.durationMs / 1000).toFixed(1)}s
+*Usuarios Activos:* ${stats.activeUsers || 0}
+*Ofertas obtenidas:* ${stats.jobsFound || 0}
+*Errores recientes:* ${stats.errors?.length ? stats.errors.join('\\n') : 'Ninguno'}`;
+
+    return bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+});
+
 // Respuestas al Wizard
 bot.on('message', (msg) => handleMessage(bot, msg));
 

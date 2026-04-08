@@ -94,6 +94,7 @@ function matchesQueries(job, queries = []) {
 }
 
 let isScraping = false;
+let runStats = { lastRun: null, durationMs: 0, lastRunStatus: 'idle', activeUsers: 0 };
 
 async function runScraperCycle(bot) {
     if (isScraping) {
@@ -101,6 +102,9 @@ async function runScraperCycle(bot) {
         return;
     }
     isScraping = true;
+    const startTime = Date.now();
+    let jobsFoundCount = 0;
+    runStats.lastRunStatus = 'running';
     
     try {
         const activeUsersDB = await getActiveUsers();
@@ -113,6 +117,7 @@ async function runScraperCycle(bot) {
         for (const u of activeUsersDB) {
             usersConfig[u.chat_id] = await getUserConfig(u.chat_id);
         }
+        runStats.activeUsers = activeUsersDB.length;
 
         const sharedQueries = buildSharedQueries(usersConfig);
 
@@ -131,6 +136,8 @@ async function runScraperCycle(bot) {
         try { laborumJobs = await scrapeLaborum(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
         try { gobJobs = await scrapeGetOnBoard(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
         try { trabajandoJobs = await scrapeTrabajandog(sharedQueries, new Set(), maxAgeDays); } catch(e) { console.error(e.message); }
+
+        jobsFoundCount = tgJobs.length + laborumJobs.length + gobJobs.length + trabajandoJobs.length;
 
         // 2. Evaluamos y notificamos Usuario por Usuario
         for (const chatId of Object.keys(usersConfig)) {
@@ -204,7 +211,14 @@ async function runScraperCycle(bot) {
         
     } finally {
         isScraping = false;
+        runStats.lastRun = new Date();
+        runStats.durationMs = Date.now() - startTime;
+        runStats.jobsFound = jobsFoundCount;
     }
 }
 
-module.exports = { runScraperCycle };
+function getRunStats() {
+    return runStats;
+}
+
+module.exports = { runScraperCycle, getRunStats };
