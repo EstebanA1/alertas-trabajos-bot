@@ -62,6 +62,7 @@ function buildStartMenuKeyboard() {
     return {
         inline_keyboard: [
             [{ text: '✏️ Editar configuración', callback_data: 'start_edit' }],
+            [{ text: '💡 Optimizar config con IA', callback_data: 'suggest_from_config' }],
             [{ text: '🔄 Reiniciar desde cero', callback_data: 'start_reset' }],
             [{ text: '📋 Ver resumen actual', callback_data: 'wizard_summary' }],
             [{ text: '🗑️ Limpiar mis datos', callback_data: 'start_clean' }],
@@ -72,6 +73,7 @@ function buildStartMenuKeyboard() {
 function buildSummaryKeyboard(config) {
     const rows = [
         [{ text: '✅ Confirmar y activar', callback_data: 'wizard_confirm' }],
+        [{ text: '💡 Optimizar config con IA', callback_data: 'suggest_from_config' }],
         [{ text: '✏️ Editar configuración', callback_data: 'wizard_edit_menu' }],
         [{ text: '🔄 Reiniciar', callback_data: 'start_reset' }],
     ];

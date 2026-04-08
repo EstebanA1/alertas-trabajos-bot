@@ -146,6 +146,64 @@ async function handleCallbackQuery(bot, callbackQuery) {
         return sendPortalSelection(bot, chatId, []);
     }
 
+    if (data === 'suggest_from_config') {
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.sendMessage(chatId, '⏳ Analizando tu configuración actual para sugerir mejoras...', { parse_mode: 'Markdown' });
+
+        const draft = await getUserDraftConfig(chatId);
+        let suggestions = null;
+        try {
+            suggestions = await generateRecommendations(draft);
+            await savePendingSuggestion(chatId, suggestions);
+        } catch (err) {
+            console.error(`[Recomendaciones] Error para ${chatId}:`, err.message);
+            return bot.sendMessage(
+                chatId,
+                '⚠️ No pude generar sugerencias en este momento. Puedes ver tu resumen de nuevo.',
+                { reply_markup: { inline_keyboard: [[{ text: '📋 Ver resumen actual', callback_data: 'wizard_summary' }]] } }
+            );
+        }
+
+        const origQ = (draft.queries  || []).join(', ') || 'ninguno';
+        const origW = (draft.whitelist || []).join(', ') || 'ninguna';
+        const sugQ  = suggestions.queries.join(', ')   || 'ninguno';
+        const sugW  = suggestions.whitelist.join(', ') || 'ninguna';
+
+        return bot.sendMessage(
+            chatId,
+            `💡 *Sugerencias de mejora:*\n\n` +
+            `*Cargos buscados*\n` +
+            `  Actual: \`${origQ}\`\n` +
+            `  Sugerido: \`${sugQ}\`\n\n` +
+            `*Palabras clave*\n` +
+            `  Actual: \`${origW}\`\n` +
+            `  Sugerido: \`${sugW}\`\n\n` +
+            `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '✅ Aplicar sugerencias', callback_data: 'apply_config_suggestions' }],
+                        [{ text: '↩️ Mantener mi versión', callback_data: 'wizard_summary' }],
+                    ]
+                }
+            }
+        );
+    }
+
+    if (data === 'apply_config_suggestions') {
+        const suggestions = await getPendingSuggestion(chatId);
+        if (suggestions) {
+            if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            await clearPendingSuggestion(chatId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        return showSummary(bot, chatId);
+    }
+
     if (data === 'cv_suggest_improvements') {
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
         await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
