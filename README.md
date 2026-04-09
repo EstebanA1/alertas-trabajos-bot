@@ -107,6 +107,7 @@ El archivo `db/database.sqlite` se crea automáticamente al iniciar.
 | `/start` | Inicia el wizard de configuración (CV o manual) |
 | `/status` | Muestra tu configuración actual |
 | `/edit` | Edita un campo de tu configuración |
+| `/clean` | Borra tu configuración e historial de ofertas |
 | `/pause` | Pausa las notificaciones temporalmente |
 | `/resume` | Reanuda las notificaciones |
 | `/help` | Muestra ayuda y descripción de comandos |

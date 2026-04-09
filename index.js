@@ -144,6 +144,20 @@ bot.onText(/^\/admin$/, async (msg) => {
     return bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
 });
 
+bot.onText(/^\/clean$/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    const text = `⚠️ *Peligro*\n\nEstás a punto de borrar TODA tu configuración, tu borrador y tu historial de ofertas vistas. Empezarás desde cero absoluto y podrías volver a recibir ofertas que ya habías visto.\n\n¿Estás realmente seguro?`;
+    return bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '☠️ Sí, borrar todo', callback_data: 'start_clean_confirm' }],
+                [{ text: '❌ Cancelar', callback_data: 'wizard_summary' }]
+            ]
+        }
+    });
+});
+
 // Respuestas al Wizard
 bot.on('message', (msg) => handleMessage(bot, msg));
 
