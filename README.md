@@ -9,7 +9,7 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
 ## ✨ Características Principales
 
 - **🧍 Multiusuario:** Cada usuario tiene sus propios filtros y configuración aislada.
-- **📄 Setup por CV (nuevo):** Sube tu CV en PDF y el bot extrae automáticamente cargos, habilidades y años de experiencia via Gemini IA. También sugiere mejoras a tu configuración.
+- **📄 Setup por CV:** Sube tu CV en PDF y el bot extrae automáticamente cargos, habilidades y años de experiencia via Gemini IA. También sugiere mejoras a tu configuración.
 - **💬 Setup Manual Conversacional:** Wizard paso a paso sin tocar código.
 - **🎯 Filtrado de Alta Precisión:**
   - **Portal Selection:** Elige qué portales quieres monitorear.
@@ -17,8 +17,8 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
   - **Whitelist:** Palabras clave que la oferta debe contener.
   - **Blacklist Soft / Hard:** Ignora ofertas con palabras no deseadas (con tolerancia configurable).
   - **Filtro de Experiencia:** Descarta trabajos que superen tu seniority.
-- **💡 Recomendaciones IA (nuevo):** Luego del análisis del CV, Gemini sugiere sinónimos de cargos y keywords adicionales para ampliar el alcance de búsqueda.
-- **🗑️ Limpiar datos (nuevo):** Borra configuración e historial de ofertas vistas para probar desde cero rápidamente.
+- **💡 Recomendaciones IA:** Luego del análisis del CV, Gemini sugiere sinónimos de cargos y keywords adicionales para ampliar el alcance de búsqueda.
+- **🗑️ Limpiar datos:** Borra configuración e historial de ofertas vistas para probar desde cero rápidamente.
 - **🔑 Bring Your Own Key (BYOK):** Para Computrabajo se usa una ScraperAPI Key personal.
 - **📉 Deduplicación por usuario:** Nunca recibirás la misma oferta dos veces.
 

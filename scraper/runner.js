@@ -95,6 +95,7 @@ function matchesQueries(job, queries = []) {
 
 let isScraping = false;
 let runStats = { lastRun: null, durationMs: 0, lastRunStatus: 'idle', activeUsers: 0 };
+const userLastCTScrape = new Map();
 
 async function runScraperCycle(bot) {
     if (isScraping) {
@@ -153,14 +154,21 @@ async function runScraperCycle(bot) {
             if (portals.includes('trabajando')) userJobs.push(...trabajandoJobs);
 
             // B. Scraper Particular: Computrabajo
-            // Como requiere API KEY, se hace "onRequest" de las queries específicas de este usuario
+            // Como requiere API KEY, se hace "onRequest". Limitado a 1 vez por hora (3600000 ms) por usuario para ahorrar ScraperAPI credits.
             if (portals.includes('computrabajo') && conf.scraperapi_key && conf.queries && conf.queries.length > 0) {
-                try {
-                    console.log(`[BYOK] Scrapeando Computrabajo para el usuario ${chatId}...`);
-                    const ctJobs = await scrapeComputrabajo(conf.queries, conf.scraperapi_key, new Set(), conf.days_lookback || 1);
-                    userJobs.push(...ctJobs);
-                } catch(e) {
-                    console.error(`Error CT Usuario ${chatId}: ${e.message}`);
+                const lastCT = userLastCTScrape.get(chatId) || 0;
+                if (Date.now() - lastCT >= 3600000) {
+                    try {
+                        console.log(`[BYOK] Scrapeando Computrabajo para el usuario ${chatId}...`);
+                        const ctJobs = await scrapeComputrabajo(conf.queries, conf.scraperapi_key, new Set(), conf.days_lookback || 1);
+                        userJobs.push(...ctJobs);
+                        userLastCTScrape.set(chatId, Date.now());
+                    } catch(e) {
+                        console.error(`Error CT Usuario ${chatId}: ${e.message}`);
+                    }
+                } else {
+                    const minsLeft = Math.ceil((3600000 - (Date.now() - lastCT)) / 60000);
+                    console.log(`[BYOK] Saltando Computrabajo para ${chatId} (En cooldown por ${minsLeft} min)`);
                 }
             }
 
