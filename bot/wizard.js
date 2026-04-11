@@ -159,7 +159,7 @@ Para poder buscar en Computrabajo, el bot necesita una clave personal gratuita. 
 
 El plan gratuito es suficiente para uso personal. ✅`;
         case 'cv_upload':
-            return `📄 *Envíame tu CV en formato PDF*\n\n_El archivo debe estar en español y no estar escaneado (imagen). Tamaño máximo: 5 MB._\n\nAnalizaré tu CV y pre-completaré automáticamente los campos de búsqueda.`;
+            return `📄 *Envíame tu CV en formato PDF*\n\n_El archivo debe estar en español y no estar escaneado (imagen). Tamaño máximo: 5 MB._\n\nAnalizaré tu CV y pre-completaré automáticamente los campos de búsqueda.\n\n👇 *Toca el ícono del clip (📎) abajo para buscar y subir tu archivo.*`;
         default:
             return '';
     }
