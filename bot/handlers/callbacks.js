@@ -195,8 +195,16 @@ async function handleCallbackQuery(bot, callbackQuery) {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '✅ Aplicar sugerencias', callback_data: 'apply_config_suggestions' }],
-                        [{ text: '↩️ Mantener mi versión', callback_data: 'wizard_summary' }],
+                        [{ text: '✅ Aplicar TODAS las sugerencias', callback_data: 'apply_config_suggestions' }],
+                        [
+                            { text: '➕ Solo Cargos', callback_data: 'apply_partial_queries' },
+                            { text: '➕ Solo P. Clave', callback_data: 'apply_partial_whitelist' }
+                        ],
+                        [
+                            { text: '➕ Solo Evitar', callback_data: 'apply_partial_bsoft' },
+                            { text: '➕ Solo Bloq.', callback_data: 'apply_partial_bhard' }
+                        ],
+                        [{ text: '➡️ Continuar al resumen', callback_data: 'wizard_summary' }],
                     ]
                 }
             }
@@ -266,8 +274,16 @@ async function handleCallbackQuery(bot, callbackQuery) {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '✅ Aplicar sugerencias', callback_data: 'cv_apply_suggestions' }],
-                        [{ text: '↩️ Mantener mi versión', callback_data: 'cv_reject_suggestions' }],
+                        [{ text: '✅ Aplicar TODAS las sugerencias', callback_data: 'cv_apply_suggestions' }],
+                        [
+                            { text: '➕ Solo Cargos', callback_data: 'apply_partial_queries' },
+                            { text: '➕ Solo P. Clave', callback_data: 'apply_partial_whitelist' }
+                        ],
+                        [
+                            { text: '➕ Solo Evitar', callback_data: 'apply_partial_bsoft' },
+                            { text: '➕ Solo Bloq.', callback_data: 'apply_partial_bhard' }
+                        ],
+                        [{ text: '➡️ Continuar', callback_data: 'cv_reject_suggestions' }],
                     ]
                 }
             }
@@ -322,7 +338,14 @@ async function handleCallbackQuery(bot, callbackQuery) {
             await commitUserConfigDraft(chatId, { active: true });
             const config = await getUserConfig(chatId);
             await bot.answerCallbackQuery(callbackQuery.id, { text: 'Configuración activada.' });
-            return bot.sendMessage(chatId, `🎉 *¡Configuración guardada!*\n\nTu bot ya quedó activo. A partir de ahora te enviaré alertas según este perfil:\n\n${formatUserConfig(config, { active: true })}\n\nPuedes revisar o cambiar cualquier cosa con /status o /edit.`, {
+            return bot.sendMessage(chatId, `🎉 *¡Configuración guardada!*\n\nTu bot ya quedó activo. A partir de ahora te enviaré alertas según este perfil:\n\n${formatUserConfig(config, { active: true })}\n\n` +
+                `*Comandos útiles:*\n` +
+                `/status - Muestra esta configuración\n` +
+                `/edit - Cambiar algún campo\n` +
+                `/pause - Pausar alertas temporalmente\n` +
+                `/resume - Reanudar alertas\n` +
+                `/clean - Borrar todo e iniciar de cero\n` +
+                `/help - Muestra la lista de comandos`, {
                 parse_mode: 'Markdown',
             });
         } catch (err) {
@@ -340,6 +363,31 @@ async function handleCallbackQuery(bot, callbackQuery) {
         return bot.sendMessage(chatId, 'Borrador descartado. Tu configuración activa no cambió. Usa /start para comenzar de nuevo o /status para revisar tu configuración.', {
             parse_mode: 'Markdown',
         });
+    }
+
+    if (data.startsWith('apply_partial_')) {
+        const fieldMap = {
+            'apply_partial_queries': 'queries',
+            'apply_partial_whitelist': 'whitelist',
+            'apply_partial_bsoft': 'blacklist_soft',
+            'apply_partial_bhard': 'blacklist_hard'
+        };
+        const fieldNameMap = {
+            'queries': 'Cargos',
+            'whitelist': 'Palabras Clave',
+            'blacklist_soft': 'Palabras a Evitar',
+            'blacklist_hard': 'Bloqueantes'
+        };
+        const field = fieldMap[data];
+        const suggestions = await getPendingSuggestion(chatId);
+        
+        if (suggestions && suggestions[field] && suggestions[field].length) {
+            await updateDraftFieldOnly(chatId, field, suggestions[field]);
+            await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Sugerencias de '${fieldNameMap[field]}' aplicadas a tu borrador.` });
+        } else {
+            await bot.answerCallbackQuery(callbackQuery.id, { text: `No había nada para sugerir en este campo.` });
+        }
+        return;
     }
 
     if (data.startsWith('edit_field_')) {
