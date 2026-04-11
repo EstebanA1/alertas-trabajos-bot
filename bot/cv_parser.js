@@ -67,7 +67,9 @@ ${truncated}`;
     return {
         queries: Array.isArray(parsed.queries) ? parsed.queries.slice(0, 5) : [],
         whitelist: Array.isArray(parsed.whitelist) ? parsed.whitelist.slice(0, 8) : [],
-        years_experience: typeof parsed.years_experience === 'number' ? Math.min(Math.max(parsed.years_experience, 0), 40) : null,
+        years_experience: typeof parsed.years_experience === 'number' 
+            ? (parsed.years_experience === 0 ? 1 : Math.min(Math.max(parsed.years_experience, 0), 40)) 
+            : null,
     };
 }
 

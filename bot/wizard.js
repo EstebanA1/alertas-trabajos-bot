@@ -99,6 +99,24 @@ function buildEditMenuKeyboard(config) {
     return { inline_keyboard: rows };
 }
 
+function buildSuggestionKeyboard(toggles = ['queries', 'whitelist', 'blacklist_soft', 'blacklist_hard'], isCvMode = true) {
+    const isChecked = (key) => toggles.includes(key) ? '✅' : '⬜';
+    return {
+        inline_keyboard: [
+            [
+                { text: `${isChecked('queries')} Cargos`, callback_data: `toggle_sug_queries` },
+                { text: `${isChecked('whitelist')} P. Clave`, callback_data: `toggle_sug_whitelist` }
+            ],
+            [
+                { text: `${isChecked('blacklist_soft')} Evitar`, callback_data: `toggle_sug_bsoft` },
+                { text: `${isChecked('blacklist_hard')} Bloq.`, callback_data: `toggle_sug_bhard` }
+            ],
+            [{ text: '💾 Aplicar Seleccionados', callback_data: isCvMode ? 'cv_apply_suggestions' : 'apply_config_suggestions' }],
+            [{ text: 'Descartar y Continuar ➡️', callback_data: isCvMode ? 'cv_reject_suggestions' : 'wizard_summary' }]
+        ]
+    };
+}
+
 function formatUserConfig(config, { active = false } = {}) {
     const expLabel = config.years_experience != null
         ? `${config.years_experience} año(s)`
@@ -167,13 +185,14 @@ El plan gratuito es suficiente para uso personal. ✅`;
 
 module.exports = {
     PORTAL_DEFINITIONS,
-    buildCvChoiceKeyboard,
     buildPortalKeyboard,
+    buildCvChoiceKeyboard,
     buildStartMenuKeyboard,
     buildSummaryKeyboard,
     buildEditMenuKeyboard,
-    formatUserConfig,
+    buildSuggestionKeyboard,
     hasConfiguredData,
+    formatUserConfig,
     normalizeCsvInput,
     isNoneKeyword,
     getPromptForField,

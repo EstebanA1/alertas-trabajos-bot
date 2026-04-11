@@ -152,10 +152,13 @@ async function handleCallbackQuery(bot, callbackQuery) {
         await bot.sendMessage(chatId, '⏳ Analizando tu configuración actual para sugerir mejoras...', { parse_mode: 'Markdown' });
 
         const draft = await getUserDraftConfig(chatId);
-        let suggestions = null;
+        let rawSuggestions = null;
         try {
-            suggestions = await generateRecommendations(draft);
-            await savePendingSuggestion(chatId, suggestions);
+            rawSuggestions = await generateRecommendations(draft);
+            await savePendingSuggestion(chatId, {
+                data: rawSuggestions,
+                toggles: ['queries', 'whitelist', 'blacklist_soft', 'blacklist_hard']
+            });
         } catch (err) {
             console.error(`[Recomendaciones] Error para ${chatId}:`, err.message);
             return bot.sendMessage(
@@ -170,10 +173,10 @@ async function handleCallbackQuery(bot, callbackQuery) {
         const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
         const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
         
-        const sugQ  = (suggestions.queries || []).join(', ')   || 'ninguno';
-        const sugW  = (suggestions.whitelist || []).join(', ') || 'ninguna';
-        const sugBS  = (suggestions.blacklist_soft || []).join(', ') || 'ninguna';
-        const sugBH  = (suggestions.blacklist_hard || []).join(', ') || 'ninguna';
+        const sugQ  = (rawSuggestions.queries || []).join(', ')   || 'ninguno';
+        const sugW  = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS  = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH  = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -193,31 +196,20 @@ async function handleCallbackQuery(bot, callbackQuery) {
             `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
             {
                 parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '✅ Aplicar TODAS las sugerencias', callback_data: 'apply_config_suggestions' }],
-                        [
-                            { text: '➕ Solo Cargos', callback_data: 'apply_partial_queries' },
-                            { text: '➕ Solo P. Clave', callback_data: 'apply_partial_whitelist' }
-                        ],
-                        [
-                            { text: '➕ Solo Evitar', callback_data: 'apply_partial_bsoft' },
-                            { text: '➕ Solo Bloq.', callback_data: 'apply_partial_bhard' }
-                        ],
-                        [{ text: '➡️ Continuar al resumen', callback_data: 'wizard_summary' }],
-                    ]
-                }
+                reply_markup: buildSuggestionKeyboard(['queries', 'whitelist', 'blacklist_soft', 'blacklist_hard'], false)
             }
         );
     }
 
     if (data === 'apply_config_suggestions') {
-        const suggestions = await getPendingSuggestion(chatId);
-        if (suggestions) {
-            if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
-            if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
-            if (suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
-            if (suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
+        const wrap = await getPendingSuggestion(chatId);
+        if (wrap && wrap.data) {
+            const suggestions = wrap.data;
+            const toggles = wrap.toggles || [];
+            if (toggles.includes('queries') && suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (toggles.includes('whitelist') && suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            if (toggles.includes('blacklist_soft') && suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
+            if (toggles.includes('blacklist_hard') && suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
@@ -231,10 +223,13 @@ async function handleCallbackQuery(bot, callbackQuery) {
         await bot.sendMessage(chatId, '⏳ Analizando tu perfil para sugerir mejoras...', { parse_mode: 'Markdown' });
 
         const draft = await getUserDraftConfig(chatId);
-        let suggestions = null;
+        let rawSuggestions = null;
         try {
-            suggestions = await generateRecommendations(draft);
-            await savePendingSuggestion(chatId, suggestions);
+            rawSuggestions = await generateRecommendations(draft);
+            await savePendingSuggestion(chatId, {
+                data: rawSuggestions,
+                toggles: ['queries', 'whitelist', 'blacklist_soft', 'blacklist_hard']
+            });
         } catch (err) {
             console.error(`[Recomendaciones] Error para ${chatId}:`, err.message);
             return bot.sendMessage(
@@ -249,10 +244,10 @@ async function handleCallbackQuery(bot, callbackQuery) {
         const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
         const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
         
-        const sugQ  = (suggestions.queries || []).join(', ')   || 'ninguno';
-        const sugW  = (suggestions.whitelist || []).join(', ') || 'ninguna';
-        const sugBS  = (suggestions.blacklist_soft || []).join(', ') || 'ninguna';
-        const sugBH  = (suggestions.blacklist_hard || []).join(', ') || 'ninguna';
+        const sugQ  = (rawSuggestions.queries || []).join(', ')   || 'ninguno';
+        const sugW  = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS  = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH  = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -272,31 +267,20 @@ async function handleCallbackQuery(bot, callbackQuery) {
             `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
             {
                 parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '✅ Aplicar TODAS las sugerencias', callback_data: 'cv_apply_suggestions' }],
-                        [
-                            { text: '➕ Solo Cargos', callback_data: 'apply_partial_queries' },
-                            { text: '➕ Solo P. Clave', callback_data: 'apply_partial_whitelist' }
-                        ],
-                        [
-                            { text: '➕ Solo Evitar', callback_data: 'apply_partial_bsoft' },
-                            { text: '➕ Solo Bloq.', callback_data: 'apply_partial_bhard' }
-                        ],
-                        [{ text: '➡️ Continuar', callback_data: 'cv_reject_suggestions' }],
-                    ]
-                }
+                reply_markup: buildSuggestionKeyboard(['queries', 'whitelist', 'blacklist_soft', 'blacklist_hard'], true)
             }
         );
     }
 
     if (data === 'cv_apply_suggestions') {
-        const suggestions = await getPendingSuggestion(chatId);
-        if (suggestions) {
-            if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
-            if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
-            if (suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
-            if (suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
+        const wrap = await getPendingSuggestion(chatId);
+        if (wrap && wrap.data) {
+            const suggestions = wrap.data;
+            const toggles = wrap.toggles || [];
+            if (toggles.includes('queries') && suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (toggles.includes('whitelist') && suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            if (toggles.includes('blacklist_soft') && suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
+            if (toggles.includes('blacklist_hard') && suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
@@ -365,29 +349,42 @@ async function handleCallbackQuery(bot, callbackQuery) {
         });
     }
 
-    if (data.startsWith('apply_partial_')) {
+    if (data.startsWith('toggle_sug_')) {
         const fieldMap = {
-            'apply_partial_queries': 'queries',
-            'apply_partial_whitelist': 'whitelist',
-            'apply_partial_bsoft': 'blacklist_soft',
-            'apply_partial_bhard': 'blacklist_hard'
-        };
-        const fieldNameMap = {
-            'queries': 'Cargos',
-            'whitelist': 'Palabras Clave',
-            'blacklist_soft': 'Palabras a Evitar',
-            'blacklist_hard': 'Bloqueantes'
+            'toggle_sug_queries': 'queries',
+            'toggle_sug_whitelist': 'whitelist',
+            'toggle_sug_bsoft': 'blacklist_soft',
+            'toggle_sug_bhard': 'blacklist_hard'
         };
         const field = fieldMap[data];
-        const suggestions = await getPendingSuggestion(chatId);
+        const suggestionsWrap = await getPendingSuggestion(chatId);
         
-        if (suggestions && suggestions[field] && suggestions[field].length) {
-            await updateDraftFieldOnly(chatId, field, suggestions[field]);
-            await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Sugerencias de '${fieldNameMap[field]}' aplicadas a tu borrador.` });
-        } else {
-            await bot.answerCallbackQuery(callbackQuery.id, { text: `No había nada para sugerir en este campo.` });
+        if (!suggestionsWrap || !suggestionsWrap.toggles) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: `Sugerencias caducadas.` });
         }
-        return;
+
+        let toggles = suggestionsWrap.toggles;
+        if (toggles.includes(field)) {
+            toggles = toggles.filter(t => t !== field);
+        } else {
+            toggles.push(field);
+        }
+        suggestionsWrap.toggles = toggles;
+        await savePendingSuggestion(chatId, suggestionsWrap);
+        
+        // Determinar si estamos en modo CV o Config para el botón de Guardar
+        // Una pista rápida es chequear si el state es AWAITING_PORTALS (CV) o no. Pero más fácil es buscar si original UI tenía "cv_apply_suggestions"
+        // Como no tenemos el state de forma fácil, el markup siempre puede usar CV si state=AWAITING_PORTALS o AWAITING_CV_CHOICE
+        const user = await getUser(chatId);
+        const isCvMode = user.state === 'AWAITING_CV_CHOICE' || user.state === 'AWAITING_PORTALS';
+
+        const { buildSuggestionKeyboard } = require('../wizard');
+        await bot.editMessageReplyMarkup(buildSuggestionKeyboard(toggles, isCvMode), {
+            chat_id: chatId,
+            message_id: callbackQuery.message.message_id
+        });
+
+        return bot.answerCallbackQuery(callbackQuery.id);
     }
 
     if (data.startsWith('edit_field_')) {
