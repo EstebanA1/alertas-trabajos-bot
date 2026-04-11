@@ -67,7 +67,7 @@ async function continueAfterPortals(bot, chatId, user, config) {
         return promptField(bot, chatId, 'scraperapi_key', editing);
     }
 
-    if (editing) {
+    if (editing || (config.queries && config.queries.length > 0)) {
         const updatedUser = await getUser(chatId);
         return sendSummary(bot, chatId, config, updatedUser);
     }

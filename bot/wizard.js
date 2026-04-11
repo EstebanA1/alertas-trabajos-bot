@@ -1,5 +1,5 @@
 const PORTAL_DEFINITIONS = [
-    { id: 'telegram', label: 'DCCEmpleoSinFiltro · Canal Telegram  ⚠️ Principalmente ofertas TI' },
+    { id: 'telegram', label: 'Canal Telegram (DCCEmpleo - Solo TI)' },
     { id: 'getonboard', label: 'GetOnBoard' },
     { id: 'laborum', label: 'Laborum' },
     { id: 'trabajando', label: 'Trabajando' },

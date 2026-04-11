@@ -2,12 +2,7 @@ const { createUser, getUser, getUserConfig, resetUserConfiguration, startUserCon
 const { buildPortalKeyboard, buildStartMenuKeyboard, buildCvChoiceKeyboard, hasConfiguredData, formatUserConfig } = require('../wizard');
 
 async function sendPortalSelection(bot, chatId, selectedPortals = []) {
-    const welcomeText = `🚀 *¡Hola! Misión: encontrarte trabajo.*
-
-Soy un bot personalizable. Buscaré ofertas para ti cada 5 minutos y te avisaré apenas encuentre algo que calce con tus filtros.
-
-*Paso 1: ¿De qué plataformas quieres recibir alertas?*
-Marca una o más opciones y luego presiona *Continuar*.`;
+    const welcomeText = `*Paso 1: ¿De qué plataformas quieres recibir alertas?*\nMarca una o más opciones y luego presiona *Continuar*.`;
 
     return bot.sendMessage(chatId, welcomeText, {
         parse_mode: 'Markdown',
