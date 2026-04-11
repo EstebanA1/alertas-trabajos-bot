@@ -37,7 +37,10 @@ async function extractCvDataWithGemini(cvText) {
     if (!apiKey) throw new Error('GEMINI_API_KEY no está configurada en el servidor.');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: "application/json" }
+    });
 
     // Limitar el texto para no exceder tokens (aprox. 10.000 chars ~ 2.500 tokens)
     const truncated = cvText.substring(0, 10000);
@@ -100,7 +103,10 @@ async function generateRecommendations(currentConfig) {
     if (!apiKey) throw new Error('GEMINI_API_KEY no configurada.');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: "application/json" }
+    });
 
     const prompt = `Eres un experto en búsqueda de empleo en Chile (Computrabajo, Laborum, GetOnBoard).
 
