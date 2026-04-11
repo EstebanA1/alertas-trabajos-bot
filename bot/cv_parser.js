@@ -118,7 +118,7 @@ El usuario tiene esta configuración de búsqueda:
 Sugiere mejoras para ampliar el alcance SIN cambiar el perfil, e incluye términos para evitar cargos basuras o que no calcen:
 1. Agrega sinónimos o variantes de los cargos (ej: "contador" → agrega "contador general", "analista contable")
 2. Agrega palabras clave relevantes que probablemente faltan.
-3. Sugiere palabras para "blacklist_soft" (palabras poco deseables, ej: "práctica", "junior" si es senior, "presencial" si busca remoto, etc.).
+3. Sugiere palabras para "blacklist_soft" (palabras poco deseables. Ej: "práctica", "junior" si es senior. MUY IMPORTANTE EN TI: agrega lenguajes o tecnologías populares que NO domina y que suelen ser de otros stacks, ej: si es programador de React/Node, agrega "java", ".net", "php", "angular", etc. Así se penalizan ofertas que buscan a alguien muy distinto).
 4. Sugiere palabras para "blacklist_hard" (cargos completamente alejados que suelen aparecer mezclados, ej: "reemplazo", "vendedor", "call center").
 5. Máximo 6 cargos, 10 palabras whitelist, y 5 palabras por cada blacklist.
 6. Usa minúsculas y sin tildes. NO repitas lo que ya tiene.
