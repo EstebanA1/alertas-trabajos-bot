@@ -64,12 +64,22 @@ ${truncated}`;
 
     const parsed = JSON.parse(cleaned);
 
+    let exp = null;
+    if (parsed.years_experience !== undefined && parsed.years_experience !== null) {
+        exp = Number(parsed.years_experience);
+        if (!isNaN(exp)) {
+            exp = Math.round(exp); // Convert 0.5 to 1
+            if (exp === 0) exp = 1;
+            exp = Math.min(Math.max(exp, 1), 40);
+        } else {
+            exp = null;
+        }
+    }
+
     return {
         queries: Array.isArray(parsed.queries) ? parsed.queries.slice(0, 5) : [],
         whitelist: Array.isArray(parsed.whitelist) ? parsed.whitelist.slice(0, 8) : [],
-        years_experience: typeof parsed.years_experience === 'number' 
-            ? (parsed.years_experience === 0 ? 1 : Math.min(Math.max(parsed.years_experience, 0), 40)) 
-            : null,
+        years_experience: exp,
     };
 }
 
