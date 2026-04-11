@@ -141,14 +141,14 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
     if (data === 'cv_skip_suggestions') {
         await bot.answerCallbackQuery(callbackQuery.id);
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
 
     if (data === 'suggest_from_config') {
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         await bot.sendMessage(chatId, '⏳ Analizando tu configuración actual para sugerir mejoras...', { parse_mode: 'Markdown' });
 
         const draft = await getUserDraftConfig(chatId);
@@ -168,15 +168,15 @@ async function handleCallbackQuery(bot, callbackQuery) {
             );
         }
 
-        const origQ = (draft.queries  || []).join(', ') || 'ninguno';
+        const origQ = (draft.queries || []).join(', ') || 'ninguno';
         const origW = (draft.whitelist || []).join(', ') || 'ninguna';
         const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
         const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
-        
-        const sugQ  = (rawSuggestions.queries || []).join(', ')   || 'ninguno';
-        const sugW  = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
-        const sugBS  = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
-        const sugBH  = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
+
+        const sugQ = (rawSuggestions.queries || []).join(', ') || 'ninguno';
+        const sugW = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -206,20 +206,20 @@ async function handleCallbackQuery(bot, callbackQuery) {
         if (wrap && wrap.data) {
             const suggestions = wrap.data;
             const toggles = wrap.toggles || [];
-            if (toggles.includes('queries') && suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (toggles.includes('queries') && suggestions.queries?.length) await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
             if (toggles.includes('whitelist') && suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
             if (toggles.includes('blacklist_soft') && suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
             if (toggles.includes('blacklist_hard') && suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         return showSummary(bot, chatId);
     }
 
     if (data === 'cv_suggest_improvements') {
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Generando sugerencias...' });
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         await bot.sendMessage(chatId, '⏳ Analizando tu perfil para sugerir mejoras...', { parse_mode: 'Markdown' });
 
         const draft = await getUserDraftConfig(chatId);
@@ -239,15 +239,15 @@ async function handleCallbackQuery(bot, callbackQuery) {
             );
         }
 
-        const origQ = (draft.queries  || []).join(', ') || 'ninguno';
+        const origQ = (draft.queries || []).join(', ') || 'ninguno';
         const origW = (draft.whitelist || []).join(', ') || 'ninguna';
         const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
         const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
-        
-        const sugQ  = (rawSuggestions.queries || []).join(', ')   || 'ninguno';
-        const sugW  = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
-        const sugBS  = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
-        const sugBH  = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
+
+        const sugQ = (rawSuggestions.queries || []).join(', ') || 'ninguno';
+        const sugW = (rawSuggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS = (rawSuggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH = (rawSuggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -277,14 +277,14 @@ async function handleCallbackQuery(bot, callbackQuery) {
         if (wrap && wrap.data) {
             const suggestions = wrap.data;
             const toggles = wrap.toggles || [];
-            if (toggles.includes('queries') && suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
+            if (toggles.includes('queries') && suggestions.queries?.length) await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
             if (toggles.includes('whitelist') && suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
             if (toggles.includes('blacklist_soft') && suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
             if (toggles.includes('blacklist_hard') && suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
@@ -292,7 +292,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
     if (data === 'cv_reject_suggestions') {
         await clearPendingSuggestion(chatId);
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Se mantiene tu versión original.' });
-        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => {});
+        await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
         await updateUserState(chatId, 'AWAITING_PORTALS');
         return sendPortalSelection(bot, chatId, []);
     }
@@ -329,7 +329,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
                 `/pause - Pausar alertas temporalmente\n` +
                 `/resume - Reanudar alertas\n` +
                 `/clean - Borrar todo e iniciar de cero\n` +
-                `/help - Muestra la lista de comandos`, {
+                `/help - Muestra la lista de comandos e informacion relacionada`, {
                 parse_mode: 'Markdown',
             });
         } catch (err) {
@@ -358,7 +358,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
         };
         const field = fieldMap[data];
         const suggestionsWrap = await getPendingSuggestion(chatId);
-        
+
         if (!suggestionsWrap || !suggestionsWrap.toggles) {
             return bot.answerCallbackQuery(callbackQuery.id, { text: `Sugerencias caducadas.` });
         }
@@ -371,7 +371,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
         }
         suggestionsWrap.toggles = toggles;
         await savePendingSuggestion(chatId, suggestionsWrap);
-        
+
         // Determinar si estamos en modo CV o Config para el botón de Guardar
         // Una pista rápida es chequear si el state es AWAITING_PORTALS (CV) o no. Pero más fácil es buscar si original UI tenía "cv_apply_suggestions"
         // Como no tenemos el state de forma fácil, el markup siempre puede usar CV si state=AWAITING_PORTALS o AWAITING_CV_CHOICE

@@ -28,7 +28,7 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
 
 - **Entrypoint:** `index.js` — Long-Polling Telegram + cron interno cada 5 minutos.
 - **Base de Datos:** SQLite3 (liviana, persistente, ideal para Docker/LXC).
-- **IA:** Google Gemini API (`gemini-1.5-flash`) — análisis de CV y sugerencias de mejora.
+- **IA:** Google Gemini API (`gemini-2.5-flash`) — análisis de CV de forma estructurada (JSON) y sugerencias de mejora con penalizaciones soft/hard.
 - **Controladores (`bot/handlers`):** Máquina de estados (Start, Messages, Callbacks, DocumentHandler).
 - **Orquestador (`scraper/runner.js`):** Descarga el pool global de empleos y los evalúa por usuario.
 - **Parser de CV (`bot/cv_parser.js`):** Descarga el PDF de Telegram, extrae texto con `pdf-parse` y llama a Gemini.
@@ -58,7 +58,14 @@ Diseñado para ejecutarse 24/7 en un servidor Linux o contenedor LXC (ej. Proxmo
    npm install
    ```
 
-3. **Configurar variables de entorno:**
+3. **Entorno de Desarrollo Local:**
+   Puedes levantar el bot localmente sin afectar la base de datos de producción usando una base de datos temporal y variables de entorno distintas (`.env.local`):
+   ```bash
+   npm run start:local
+   ```
+   *(Esto usará `database_local.sqlite` y leerá secretos desde `.env.local`)*
+
+4. **Configurar variables de entorno (Producción):**
    ```bash
    cp .env.example .env
    nano .env
