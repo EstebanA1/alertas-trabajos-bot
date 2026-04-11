@@ -14,7 +14,7 @@ const {
     updateDraftFieldOnly,
     updateUserState,
 } = require('../../db/database');
-const { buildCvChoiceKeyboard, buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig, getPromptForField } = require('../wizard');
+const { buildCvChoiceKeyboard, buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig, getPromptForField, buildSuggestionKeyboard } = require('../wizard');
 const { promptField, sendSummary } = require('./messages');
 const { sendPortalSelection } = require('./start');
 const { generateRecommendations } = require('../cv_parser');
@@ -378,7 +378,6 @@ async function handleCallbackQuery(bot, callbackQuery) {
         const user = await getUser(chatId);
         const isCvMode = user.state === 'AWAITING_CV_CHOICE' || user.state === 'AWAITING_PORTALS';
 
-        const { buildSuggestionKeyboard } = require('../wizard');
         await bot.editMessageReplyMarkup(buildSuggestionKeyboard(toggles, isCvMode), {
             chat_id: chatId,
             message_id: callbackQuery.message.message_id
