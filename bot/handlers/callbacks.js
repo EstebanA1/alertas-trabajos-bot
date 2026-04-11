@@ -167,8 +167,13 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
         const origQ = (draft.queries  || []).join(', ') || 'ninguno';
         const origW = (draft.whitelist || []).join(', ') || 'ninguna';
-        const sugQ  = suggestions.queries.join(', ')   || 'ninguno';
-        const sugW  = suggestions.whitelist.join(', ') || 'ninguna';
+        const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
+        const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
+        
+        const sugQ  = (suggestions.queries || []).join(', ')   || 'ninguno';
+        const sugW  = (suggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS  = (suggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH  = (suggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -179,6 +184,12 @@ async function handleCallbackQuery(bot, callbackQuery) {
             `*Palabras clave*\n` +
             `  Actual: \`${origW}\`\n` +
             `  Sugerido: \`${sugW}\`\n\n` +
+            `*Palabras a evitar (Soft)*\n` +
+            `  Actual: \`${origBS}\`\n` +
+            `  Sugerido: \`${sugBS}\`\n\n` +
+            `*Palabras bloqueantes (Hard)*\n` +
+            `  Actual: \`${origBH}\`\n` +
+            `  Sugerido: \`${sugBH}\`\n\n` +
             `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
             {
                 parse_mode: 'Markdown',
@@ -197,6 +208,8 @@ async function handleCallbackQuery(bot, callbackQuery) {
         if (suggestions) {
             if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
             if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            if (suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
+            if (suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
@@ -225,8 +238,13 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
         const origQ = (draft.queries  || []).join(', ') || 'ninguno';
         const origW = (draft.whitelist || []).join(', ') || 'ninguna';
-        const sugQ  = suggestions.queries.join(', ')   || 'ninguno';
-        const sugW  = suggestions.whitelist.join(', ') || 'ninguna';
+        const origBS = (draft.blacklist_soft || []).join(', ') || 'ninguna';
+        const origBH = (draft.blacklist_hard || []).join(', ') || 'ninguna';
+        
+        const sugQ  = (suggestions.queries || []).join(', ')   || 'ninguno';
+        const sugW  = (suggestions.whitelist || []).join(', ') || 'ninguna';
+        const sugBS  = (suggestions.blacklist_soft || []).join(', ') || 'ninguna';
+        const sugBH  = (suggestions.blacklist_hard || []).join(', ') || 'ninguna';
 
         return bot.sendMessage(
             chatId,
@@ -237,6 +255,12 @@ async function handleCallbackQuery(bot, callbackQuery) {
             `*Palabras clave*\n` +
             `  Actual: \`${origW}\`\n` +
             `  Sugerido: \`${sugW}\`\n\n` +
+            `*Palabras a evitar (Soft)*\n` +
+            `  Actual: \`${origBS}\`\n` +
+            `  Sugerido: \`${sugBS}\`\n\n` +
+            `*Palabras bloqueantes (Hard)*\n` +
+            `  Actual: \`${origBH}\`\n` +
+            `  Sugerido: \`${sugBH}\`\n\n` +
             `_¿Quieres aplicar las sugerencias o mantener tu versión?_`,
             {
                 parse_mode: 'Markdown',
@@ -255,6 +279,8 @@ async function handleCallbackQuery(bot, callbackQuery) {
         if (suggestions) {
             if (suggestions.queries?.length)   await updateDraftFieldOnly(chatId, 'queries', suggestions.queries);
             if (suggestions.whitelist?.length) await updateDraftFieldOnly(chatId, 'whitelist', suggestions.whitelist);
+            if (suggestions.blacklist_soft?.length) await updateDraftFieldOnly(chatId, 'blacklist_soft', suggestions.blacklist_soft);
+            if (suggestions.blacklist_hard?.length) await updateDraftFieldOnly(chatId, 'blacklist_hard', suggestions.blacklist_hard);
             await clearPendingSuggestion(chatId);
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });

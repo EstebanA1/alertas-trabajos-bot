@@ -173,26 +173,26 @@ async function runScraperCycle(bot) {
             }
 
             // C. Filtrado Personalizado y Envío
-            let enviadas = 0, descartadas = 0;
+            let enviadas = 0, descartadasFiltro = 0, descartadasQuery = 0, descartadasFecha = 0, repetidas = 0;
             const userQueries = Array.isArray(conf.queries) ? conf.queries : [];
             
             for (const job of userJobs) {
                 const isTg = String(job.source || '').toLowerCase().includes('telegram');
 
                 if (!isTg && !matchesQueries(job, userQueries)) {
+                    descartadasQuery++;
                     continue;
                 }
 
-                // Filtro de ventana de tiempo per-user (scrapers centrales usan la máxima, pero
-                // usuarios con ventana menor no deben recibir ofertas más antiguas que su config)
+                // Filtro de ventana de tiempo per-user
                 const userWindow = (conf.days_lookback || 1) * 24 * 60 * 60 * 1000;
                 if (job.publishedAt && job.publishedAt < Date.now() - userWindow) {
+                    descartadasFecha++;
                     continue;
                 }
 
                 if (!pasaFiltros(job, conf, isTg)) {
-                    descartadas++;
-                    // Marcamos vista para no reprocesarla tontamente al siguiente ciclo
+                    descartadasFiltro++;
                     await addSeenJobForUser(chatId, job.id);
                     continue;
                 }
@@ -205,12 +205,12 @@ async function runScraperCycle(bot) {
                         enviadas++;
                         await new Promise(r => setTimeout(r, 600)); // anti-spam
                     }
+                } else {
+                    repetidas++;
                 }
             }
 
-            if (enviadas > 0) {
-                console.log(`--> Usuario ${chatId}: ${enviadas} enviadas, ${descartadas} filtradas.`);
-            }
+            console.log(`--> Usuario ${chatId}: ${enviadas} enviadas | Descartadas: ${descartadasQuery} (query), ${descartadasFiltro} (filtros), ${descartadasFecha} (fecha), ${repetidas} (ya vistas)`);
         }
 
         // 3. Mantenimiento DB

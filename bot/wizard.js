@@ -104,15 +104,15 @@ function formatUserConfig(config, { active = false } = {}) {
         ? `${config.years_experience} año(s)`
         : 'Sin filtro';
     return `⚙️ *Tu configuración actual*\n\n` +
-        `*Estado*: ${active ? '✅ Activo' : '🟡 En configuración'}\n` +
-        `*Portales activos*: ${formatList(config.portals)}\n` +
-        `*Cargos buscados*: ${formatList(config.queries, 'Sin definir')}\n` +
-        `*Antigüedad máx. de ofertas*: ${config.days_lookback ?? 1} día(s)\n` +
-        `*Experiencia máx. requerida*: ${expLabel}\n` +
-        `*Palabras obligatorias* (la oferta debe incluir al menos una): ${formatList(config.whitelist)}\n` +
-        `*Palabras a evitar* (se tolera hasta 2): ${formatList(config.blacklist_soft)}\n` +
-        `*Palabras bloqueantes* (descarte inmediato): ${formatList(config.blacklist_hard)}\n` +
-        `*Clave Computrabajo*: ${config.portals?.includes('computrabajo') ? (config.scraperapi_key ? '✅ Guardada' : '❌ Falta') : 'No requerida'}`;
+        `🔹 *Estado*: ${active ? '✅ Activo' : '🟡 En configuración'}\n` +
+        `🔹 *Portales activos*:\n   ↳ *${formatList(config.portals)}*\n` +
+        `🔹 *Cargos buscados*:\n   ↳ *${formatList(config.queries, 'Sin definir')}*\n` +
+        `🔹 *Antigüedad máx. de ofertas*:\n   ↳ *${config.days_lookback ?? 1} día(s)*\n` +
+        `🔹 *Experiencia máx. requerida*:\n   ↳ *${expLabel}*\n` +
+        `🔹 *Palabras obligatorias* (la oferta debe incluir al menos una):\n   ↳ *${formatList(config.whitelist)}*\n` +
+        `🔹 *Palabras a evitar* (se tolera hasta 2):\n   ↳ *${formatList(config.blacklist_soft)}*\n` +
+        `🔹 *Palabras bloqueantes* (descarte inmediato):\n   ↳ *${formatList(config.blacklist_hard)}*\n` +
+        `🔹 *Clave Computrabajo*: ${config.portals?.includes('computrabajo') ? (config.scraperapi_key ? '✅ Guardada' : '❌ Falta') : 'No requerida'}`;
 }
 
 function normalizeCsvInput(text) {

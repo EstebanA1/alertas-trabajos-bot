@@ -115,16 +115,19 @@ El usuario tiene esta configuración de búsqueda:
 - Palabras clave (habilidades): ${(currentConfig.whitelist || []).join(', ') || 'ninguna'}
 - Años de experiencia: ${currentConfig.years_experience ?? 'no especificado'}
 
-Sugiere mejoras para ampliar el alcance SIN cambiar el perfil:
+Sugiere mejoras para ampliar el alcance SIN cambiar el perfil, e incluye términos para evitar cargos basuras o que no calcen:
 1. Agrega sinónimos o variantes de los cargos (ej: "contador" → agrega "contador general", "analista contable")
-2. Agrega palabras clave relevantes que probablemente faltan (herramientas, certificaciones, áreas relacionadas)
-3. Máximo 6 cargos en total y 10 palabras clave en total
-4. Usa minúsculas y sin tildes
-5. NO repitas lo que ya tiene
+2. Agrega palabras clave relevantes que probablemente faltan.
+3. Sugiere palabras para "blacklist_soft" (palabras poco deseables, ej: "práctica", "junior" si es senior, "presencial" si busca remoto, etc.).
+4. Sugiere palabras para "blacklist_hard" (cargos completamente alejados que suelen aparecer mezclados, ej: "reemplazo", "vendedor", "call center").
+5. Máximo 6 cargos, 10 palabras whitelist, y 5 palabras por cada blacklist.
+6. Usa minúsculas y sin tildes. NO repitas lo que ya tiene.
 
 Responde SOLO con JSON válido con estas claves:
 - "queries": lista completa (originales + sugeridos)
 - "whitelist": lista completa (originales + sugeridos)
+- "blacklist_soft": lista sugerida
+- "blacklist_hard": lista sugerida
 
 Sin texto adicional ni bloques markdown.`;
 
@@ -136,6 +139,8 @@ Sin texto adicional ni bloques markdown.`;
     return {
         queries:   Array.isArray(parsed.queries)   ? parsed.queries.slice(0, 6)   : (currentConfig.queries || []),
         whitelist: Array.isArray(parsed.whitelist)  ? parsed.whitelist.slice(0, 10) : (currentConfig.whitelist || []),
+        blacklist_soft: Array.isArray(parsed.blacklist_soft) ? parsed.blacklist_soft.slice(0, 5) : [],
+        blacklist_hard: Array.isArray(parsed.blacklist_hard) ? parsed.blacklist_hard.slice(0, 5) : [],
     };
 }
 
