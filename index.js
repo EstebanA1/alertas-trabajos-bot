@@ -16,7 +16,13 @@ if (!token) {
 // Iniciar bot en modo polling
 const bot = new TelegramBot(token, { polling: true });
 
-console.log("🤖 Iniciando Bot de AlertasTrabajos V2 en modo Polling...");
+const isLocal = Boolean(process.env.DB_PATH);
+const tokenPreview = token.split(':')[0];
+console.log(`\n================================================`);
+console.log(`🤖  AlertasTrabajos Bot V2`);
+console.log(`🔑  Token ID: ${tokenPreview}  [${isLocal ? '🧪 LOCAL / PRUEBAS' : '🚀 PRODUCCIÓN'}]`);
+console.log(`🗄️   DB: ${process.env.DB_PATH || 'db/database.sqlite (default)'}`);
+console.log(`================================================\n`);
 
 // Inicializar base de datos
 getDB().then(() => {

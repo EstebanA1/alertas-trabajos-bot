@@ -1,7 +1,11 @@
 node_modules/
 .env
+.env.local
 db/jobs.json
 .serena/
 logs/
 db/database.sqlite-wal
 db/database.sqlite-shm
+db/database_local.sqlite
+db/database_local.sqlite-wal
+db/database_local.sqlite-shm

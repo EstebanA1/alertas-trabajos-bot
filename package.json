@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "start:prod": "NODE_ENV=production node index.js",
+    "start:local": "node local.js",
     "start:legacy": "node test_scraper.js",
     "test": "node test_scraper.js"
   },
