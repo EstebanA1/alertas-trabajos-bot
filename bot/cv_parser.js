@@ -28,6 +28,30 @@ async function extractTextFromPdf(buffer) {
 }
 
 /**
+ * Intenta llamar a Gemini pasando por una lista de modelos hasta que uno funcione.
+ */
+async function generateContentWithFallback(genAI, prompt) {
+    const models = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+    let lastError = null;
+    
+    for (const modelName of models) {
+        try {
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+            const result = await model.generateContent(prompt);
+            console.log(`[Gemini] Análisis exitoso con el modelo: ${modelName}`);
+            return result;
+        } catch (err) {
+            console.warn(`[Gemini Fallback] El modelo ${modelName} falló temporalmente: ${err.message}`);
+            lastError = err;
+        }
+    }
+    throw new Error(`Todos los modelos de Gemini fallaron por alta demanda. Por favor intenta más tarde. Detalle: ${lastError.message}`);
+}
+
+/**
  * Llama a la API de Gemini para extraer campos del texto del CV.
  * @param {string} cvText
  * @returns {Promise<{ queries: string[], whitelist: string[], years_experience: number|null }>}
@@ -37,10 +61,6 @@ async function extractCvDataWithGemini(cvText) {
     if (!apiKey) throw new Error('GEMINI_API_KEY no está configurada en el servidor.');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: "application/json" }
-    });
 
     // Limitar el texto para no exceder tokens (aprox. 10.000 chars ~ 2.500 tokens)
     const truncated = cvText.substring(0, 10000);
@@ -56,7 +76,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esas 3 claves. Sin texto adi
 Texto del CV:
 ${truncated}`;
 
-    const result = await model.generateContent(prompt);
+    const result = await generateContentWithFallback(genAI, prompt);
     const responseText = result.response.text().trim();
 
     // Limpiar por si Gemini igual agrega backticks de markdown
@@ -115,10 +135,6 @@ async function generateRecommendations(currentConfig) {
     if (!apiKey) throw new Error('GEMINI_API_KEY no configurada.');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: "application/json" }
-    });
 
     const prompt = `Eres un experto en búsqueda de empleo en Chile (Computrabajo, Laborum, GetOnBoard).
 
@@ -143,14 +159,14 @@ Responde SOLO con JSON válido con estas claves:
 
 Sin texto adicional ni bloques markdown.`;
 
-    const result = await model.generateContent(prompt);
+    const result = await generateContentWithFallback(genAI, prompt);
     const responseText = result.response.text().trim();
     const cleaned = responseText.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
     const parsed = JSON.parse(cleaned);
 
     return {
-        queries:   Array.isArray(parsed.queries)   ? parsed.queries.slice(0, 6)   : (currentConfig.queries || []),
-        whitelist: Array.isArray(parsed.whitelist)  ? parsed.whitelist.slice(0, 10) : (currentConfig.whitelist || []),
+        queries: Array.isArray(parsed.queries) ? parsed.queries.slice(0, 6) : (currentConfig.queries || []),
+        whitelist: Array.isArray(parsed.whitelist) ? parsed.whitelist.slice(0, 10) : (currentConfig.whitelist || []),
         blacklist_soft: Array.isArray(parsed.blacklist_soft) ? parsed.blacklist_soft.slice(0, 5) : [],
         blacklist_hard: Array.isArray(parsed.blacklist_hard) ? parsed.blacklist_hard.slice(0, 5) : [],
     };

@@ -114,54 +114,73 @@ async function handleMessage(bot, msg) {
     }
 
     await updateDraftFieldOnly(chatId, fieldId, value);
+    const updatedConfig = await getUserDraftConfig(chatId);
 
-    if (user.state === 'EDITING_SCRAPERAPI_KEY' || user.state === 'EDITING_QUERIES' || user.state === 'EDITING_WHITELIST' || user.state === 'EDITING_BLACKLIST_SOFT' || user.state === 'EDITING_BLACKLIST_HARD' || user.state === 'EDITING_DAYS_LOOKBACK' || user.state === 'EDITING_EXPERIENCE_YEARS') {
-        const updatedConfig = await getUserDraftConfig(chatId);
+    // Si estamos editando un campo puntual, volver al resumen
+    if (user.state.startsWith('EDITING_')) {
         return bot.sendMessage(chatId, '✅ *Campo actualizado.*', { parse_mode: 'Markdown' })
             .then(() => sendSummary(bot, chatId, updatedConfig, user));
     }
 
-    if (user.state === 'AWAITING_SCRAPERAPI_KEY') {
+    // Si estamos en el flujo secuencial (AWAITING_...), buscar el siguiente paso vacío
+    return continueWizard(bot, chatId);
+}
+
+/**
+ * Inteligencia de navegación: busca el siguiente campo vacío y guía al usuario.
+ */
+async function continueWizard(bot, chatId) {
+    const [user, config] = await Promise.all([getUser(chatId), getUserDraftConfig(chatId)]);
+    
+    if (!config) return;
+
+    // 1. Prioridad: ScraperAPI si eligió Computrabajo y no tiene key
+    if (config.portals?.includes('computrabajo') && (!config.scraperapi_key || config.scraperapi_key.length < 5)) {
+        await updateUserState(chatId, 'AWAITING_SCRAPERAPI_KEY');
+        return promptField(bot, chatId, 'scraperapi_key');
+    }
+
+    // 2. Cargos (Queries)
+    if (!config.queries?.length) {
         await updateUserState(chatId, 'AWAITING_QUERIES');
-        return bot.sendMessage(chatId, '✅ *API Key guardada.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'queries'));
+        return promptField(bot, chatId, 'queries');
     }
 
-    if (user.state === 'AWAITING_QUERIES') {
-        await updateUserState(chatId, 'AWAITING_DAYS_LOOKBACK');
-        return bot.sendMessage(chatId, '✅ *Cargos guardados.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'days_lookback'));
+    // 3. Ventana de tiempo (Días)
+    // Si el usuario viene de un CV, el draft tendrá el default (1). 
+    // Para que sea fluido, solo preguntamos si el estado ACTUAL es AWAITING_DAYS_LOOKBACK 
+    // o si explícitamente queremos que pase por aquí.
+    // Pero si ya tiene queries (por CV) y estamos saltando, lo ideal es ir al resumen o siguiente vacío.
+    if (user.state === 'AWAITING_QUERIES' || (user.state === 'AWAITING_SCRAPERAPI_KEY' && !config.queries?.length)) {
+         // Si acabamos de llenar queries, vamos a días
+         await updateUserState(chatId, 'AWAITING_DAYS_LOOKBACK');
+         return promptField(bot, chatId, 'days_lookback');
     }
 
-    if (user.state === 'AWAITING_DAYS_LOOKBACK') {
+    // 4. Experiencia
+    if (config.years_experience === null || config.years_experience === undefined) {
         await updateUserState(chatId, 'AWAITING_EXPERIENCE_YEARS');
-        return bot.sendMessage(chatId, '✅ *Ventana de tiempo guardada.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'years_experience'));
+        return promptField(bot, chatId, 'years_experience');
     }
 
-    if (user.state === 'AWAITING_EXPERIENCE_YEARS') {
+    // 5. Whitelist
+    if (!config.whitelist?.length) {
         await updateUserState(chatId, 'AWAITING_WHITELIST');
-        return bot.sendMessage(chatId, '✅ *Experiencia guardada.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'whitelist'));
+        return promptField(bot, chatId, 'whitelist');
     }
 
-    if (user.state === 'AWAITING_WHITELIST') {
+    // 6. Blacklists (Soft y Hard)
+    if (!config.blacklist_soft?.length) {
         await updateUserState(chatId, 'AWAITING_BLACKLIST_SOFT');
-        return bot.sendMessage(chatId, '✅ *Whitelist guardada.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'blacklist_soft'));
+        return promptField(bot, chatId, 'blacklist_soft');
     }
-
-    if (user.state === 'AWAITING_BLACKLIST_SOFT') {
+    if (!config.blacklist_hard?.length) {
         await updateUserState(chatId, 'AWAITING_BLACKLIST_HARD');
-        return bot.sendMessage(chatId, '✅ *Palabras a evitar guardadas.*', { parse_mode: 'Markdown' })
-            .then(() => promptField(bot, chatId, 'blacklist_hard'));
+        return promptField(bot, chatId, 'blacklist_hard');
     }
 
-    if (user.state === 'AWAITING_BLACKLIST_HARD') {
-        const updatedConfig = await getUserDraftConfig(chatId);
-        return bot.sendMessage(chatId, '✅ *Palabras bloqueantes guardadas.*', { parse_mode: 'Markdown' })
-            .then(() => sendSummary(bot, chatId, updatedConfig, user));
-    }
+    // Si llegamos aquí, todo lo importante tiene DAto o ha sido saltado (flujo CV)
+    return sendSummary(bot, chatId, config, user);
 }
 
 async function handleDocumentMessage(bot, msg) {
@@ -208,6 +227,9 @@ async function handleDocumentMessage(bot, msg) {
     if (cvData.whitelist?.length)        await updateDraftFieldOnly(chatId, 'whitelist', cvData.whitelist);
     if (cvData.years_experience != null) await updateDraftFieldOnly(chatId, 'years_experience', cvData.years_experience);
 
+    // Actualizar estado a AWAITING_PORTALS para que el flujo siga naturalmente
+    await updateUserState(chatId, 'AWAITING_PORTALS');
+
     // Mostrar resumen de lo detectado
     const queriesStr   = cvData.queries?.length   ? cvData.queries.join(', ')   : 'No detectados';
     const whitelistStr = cvData.whitelist?.length  ? cvData.whitelist.join(', ') : 'No detectadas';
@@ -233,4 +255,4 @@ async function handleDocumentMessage(bot, msg) {
     // El avance a portales ocurre desde el callback (cv_skip_suggestions o después de aplicar/rechazar sugerencias)
 }
 
-module.exports = { handleMessage, handleDocumentMessage, promptField, sendSummary };
+module.exports = { handleMessage, handleDocumentMessage, promptField, sendSummary, continueWizard };

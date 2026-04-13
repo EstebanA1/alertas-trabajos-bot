@@ -15,7 +15,7 @@ const {
     updateUserState,
 } = require('../../db/database');
 const { buildCvChoiceKeyboard, buildEditMenuKeyboard, buildPortalKeyboard, formatUserConfig, getPromptForField, buildSuggestionKeyboard } = require('../wizard');
-const { promptField, sendSummary } = require('./messages');
+const { promptField, sendSummary, continueWizard } = require('./messages');
 const { sendPortalSelection } = require('./start');
 const { generateRecommendations } = require('../cv_parser');
 
@@ -68,8 +68,7 @@ async function continueAfterPortals(bot, chatId, user, config) {
     }
 
     if (editing || (config.queries && config.queries.length > 0)) {
-        const updatedUser = await getUser(chatId);
-        return sendSummary(bot, chatId, config, updatedUser);
+        return continueWizard(bot, chatId);
     }
 
     await updateUserState(chatId, 'AWAITING_QUERIES');
@@ -214,6 +213,13 @@ async function handleCallbackQuery(bot, callbackQuery) {
         }
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Sugerencias aplicadas.' });
         await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callbackQuery.message.message_id }).catch(() => { });
+        
+        const config = await getUserDraftConfig(chatId);
+        if (!config?.portals?.length) {
+            await updateUserState(chatId, 'AWAITING_PORTALS');
+            return sendPortalSelection(bot, chatId, []);
+        }
+        
         return showSummary(bot, chatId);
     }
 
